@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = 8000;
-const CURRENT_VERSION = '1.0.7';
+const CURRENT_VERSION = '1.0.1';
 const GITHUB_REPO = 'S1ow1i/GifStudio';
 
 function getAppStatePath() {

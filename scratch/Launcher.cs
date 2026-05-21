@@ -10,7 +10,7 @@ namespace GifStudioLauncher
     class Program
     {
         // Incrementare ad ogni build portable per forzare la ri-estrazione dell'app aggiornata
-        const string BUNDLE_VERSION = "1.0.7";
+        const string BUNDLE_VERSION = "1.0.1";
 
         [STAThread]
         static void Main(string[] args)
