@@ -1,0 +1,13 @@
+{
+  "name": "gif-studio",
+  "version": "1.0.7",
+  "description": "Gif Studio - Modifica Foto e GIF Premium (Portable)",
+  "main": "main.js",
+  "scripts": {
+    "build-portable": "compila_exe.bat"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-packager": "^17.1.2"
+  }
+}

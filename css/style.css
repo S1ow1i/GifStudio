@@ -1,0 +1,1867 @@
+/* ==========================================================================
+   GIF STUDIO - ARCHITECTURAL DESIGN SYSTEM & PREMIUM THEMES
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. SISTEMA DEI TEMI PROFESSIONALI (STILE ARCHITETTO)
+   -------------------------------------------------------------------------- */
+
+/* TEMA 1: SLATE GRIGIO (Default - Elegante, Scuro, Tecnico) */
+:root, :root.theme-dark {
+    --bg-desktop: #111216;
+    --bg-window: rgba(28, 30, 37, 0.85);
+    --bg-header: rgba(38, 42, 51, 0.95);
+    --border-window: rgba(255, 255, 255, 0.08);
+    --border-window-focus: rgba(0, 255, 204, 0.4);
+    --accent-color: #00ffcc;
+    --accent-color-hover: #00cca3;
+    --accent-color-rgb: 0, 255, 204;
+    --text-main: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-input-bg: rgba(15, 17, 23, 0.6);
+    --text-input-border: rgba(255, 255, 255, 0.1);
+    --window-radius: 10px;
+    --font-primary: 'Inter', sans-serif;
+    --font-size-base: 14.5px;
+    --shadow-window: 0 20px 40px -15px rgba(0, 0, 0, 0.6), 
+                     inset 0 1px 1px rgba(255, 255, 255, 0.05);
+    --checker-color-1: #252831;
+    --checker-color-2: #1b1d24;
+    --desktop-pattern: radial-gradient(at 0% 0%, rgba(0, 255, 204, 0.05) 0px, transparent 50%),
+                       radial-gradient(at 100% 100%, rgba(255, 255, 255, 0.02) 0px, transparent 50%);
+}
+
+/* TEMA 2: VETRO LIQUIDO (Liquid Glass - Trasparenza Estrema, Riflessi di Luce) */
+:root.theme-cyber {
+    --bg-desktop: #0a0e17;
+    --bg-window: rgba(255, 255, 255, 0.06);
+    --bg-header: rgba(255, 255, 255, 0.12);
+    --border-window: rgba(255, 255, 255, 0.2);
+    --border-window-focus: rgba(255, 255, 255, 0.6);
+    --accent-color: #ffffff;
+    --accent-color-hover: #e2e8f0;
+    --accent-color-rgb: 255, 255, 255;
+    --text-main: #ffffff;
+    --text-secondary: #cbd5e1;
+    --text-input-bg: rgba(255, 255, 255, 0.08);
+    --text-input-border: rgba(255, 255, 255, 0.15);
+    --window-radius: 16px;
+    --font-primary: 'Poppins', sans-serif;
+    --font-size-base: 14.5px;
+    --shadow-window: 0 30px 60px -10px rgba(0, 0, 0, 0.4), 
+                     inset 0 1px 2px rgba(255, 255, 255, 0.25);
+    --checker-color-1: #1e293b;
+    --checker-color-2: #0f172a;
+    --desktop-pattern: radial-gradient(at 20% 20%, rgba(255, 255, 255, 0.1) 0px, transparent 60%),
+                       radial-gradient(at 80% 80%, rgba(255, 255, 255, 0.05) 0px, transparent 50%),
+                       linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+}
+
+/* TEMA 3: MARMO NERO (Black Marble - Venature Pregiate, Lusso Tecnico) */
+:root.theme-terminal {
+    --bg-desktop: #07080a;
+    --bg-window: rgba(20, 22, 26, 0.9);
+    --bg-header: rgba(30, 33, 39, 0.95);
+    --border-window: rgba(212, 175, 55, 0.25); /* Accenti dorati */
+    --border-window-focus: rgba(212, 175, 55, 0.7);
+    --accent-color: #d4af37; /* Oro metallico */
+    --accent-color-hover: #bda030;
+    --accent-color-rgb: 212, 175, 55;
+    --text-main: #fcfbf7;
+    --text-secondary: #a3a19b;
+    --text-input-bg: rgba(10, 11, 13, 0.8);
+    --text-input-border: rgba(212, 175, 55, 0.15);
+    --window-radius: 8px;
+    --font-primary: 'Playfair Display', serif;
+    --font-size-base: 14.5px;
+    --shadow-window: 0 20px 45px -10px rgba(0, 0, 0, 0.8),
+                     0 0 10px rgba(212, 175, 55, 0.05);
+    --checker-color-1: #1e1e1e;
+    --checker-color-2: #121212;
+    /* Venature Marmoree Dorate procedurali via CSS Gradients */
+    --desktop-pattern: 
+        linear-gradient(60deg, rgba(212,175,55,0.04) 5%, transparent 25%),
+        linear-gradient(240deg, rgba(212,175,55,0.03) 10%, transparent 35%),
+        linear-gradient(135deg, rgba(255,255,255,0.01) 15%, transparent 40%),
+        radial-gradient(at 30% 20%, rgba(212,175,55,0.05) 0px, transparent 60%),
+        radial-gradient(at 70% 80%, rgba(212,175,55,0.03) 0px, transparent 50%),
+        linear-gradient(#08090c, #101217);
+}
+
+/* TEMA 4: MARMO BIANCO (White Marble - Luminoso, Raffinato, Statuario) */
+:root.theme-light {
+    --bg-desktop: #eaecef;
+    --bg-window: rgba(255, 255, 255, 0.85);
+    --bg-header: rgba(243, 244, 246, 0.95);
+    --border-window: rgba(0, 0, 0, 0.08);
+    --border-window-focus: rgba(71, 85, 105, 0.4);
+    --accent-color: #475569; /* Grigio lavagna scuro */
+    --accent-color-hover: #334155;
+    --accent-color-rgb: 71, 85, 105;
+    --text-main: #1e293b;
+    --text-secondary: #64748b;
+    --text-input-bg: rgba(241, 245, 249, 0.8);
+    --text-input-border: rgba(0, 0, 0, 0.1);
+    --window-radius: 12px;
+    --font-primary: 'Outfit', sans-serif;
+    --font-size-base: 15px;
+    --shadow-window: 0 15px 35px -10px rgba(0, 0, 0, 0.12),
+                     0 5px 15px -5px rgba(0, 0, 0, 0.05);
+    --checker-color-1: #e2e8f0;
+    --checker-color-2: #cbd5e1;
+    /* Venature Marmo Bianco */
+    --desktop-pattern: 
+        linear-gradient(45deg, rgba(0,0,0,0.015) 10%, transparent 30%),
+        linear-gradient(225deg, rgba(0,0,0,0.015) 15%, transparent 40%),
+        radial-gradient(at 10% 30%, rgba(0,0,0,0.02) 0px, transparent 40%),
+        radial-gradient(at 90% 70%, rgba(0,0,0,0.01) 0px, transparent 50%),
+        linear-gradient(#f1f3f5, #e2e6e9);
+}
+
+/* TEMA 5: CEMENTO MINIMAL (Concrete - Raw Industrial, Linee Guida Tecniche) */
+:root.theme-concrete {
+    --bg-desktop: #2e3136;
+    --bg-window: rgba(55, 59, 66, 0.9);
+    --bg-header: rgba(69, 74, 82, 0.98);
+    --border-window: rgba(255, 85, 0, 0.2); /* Arancione da cantiere / tecnico */
+    --border-window-focus: rgba(255, 85, 0, 0.7);
+    --accent-color: #ff5500; 
+    --accent-color-hover: #cc4400;
+    --accent-color-rgb: 255, 85, 0;
+    --text-main: #e8e8e8;
+    --text-secondary: #a0a6b0;
+    --text-input-bg: #1f2124;
+    --text-input-border: rgba(255, 85, 0, 0.15);
+    --window-radius: 4px;
+    --font-primary: 'Roboto', sans-serif;
+    --font-size-base: 14.5px;
+    --shadow-window: 0 15px 30px rgba(0,0,0,0.4);
+    --checker-color-1: #2a2c30;
+    --checker-color-2: #1c1d20;
+    /* Texture Cemento con micro-griglia tecnica */
+    --desktop-pattern: 
+        radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 0),
+        radial-gradient(rgba(0, 0, 0, 0.15) 1px, transparent 0),
+        linear-gradient(rgba(255,85,0,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,85,0,0.02) 1px, transparent 1px);
+    --desktop-pattern-size: 8px 8px, 8px 8px, 40px 40px, 40px 40px;
+}
+
+/* TEMA 6: RETRO TERMINAL (Codice di Precisione, Fosfori Verdi) */
+:root.theme-retro {
+    --bg-desktop: #000000;
+    --bg-window: rgba(5, 15, 5, 0.96);
+    --bg-header: rgba(10, 30, 10, 0.98);
+    --border-window: rgba(51, 255, 51, 0.3);
+    --border-window-focus: rgba(51, 255, 51, 0.9);
+    --accent-color: #33ff33;
+    --accent-color-hover: #22cc22;
+    --accent-color-rgb: 51, 255, 51;
+    --text-main: #33ff33;
+    --text-secondary: #1a881a;
+    --text-input-bg: #000000;
+    --text-input-border: rgba(51, 255, 51, 0.4);
+    --window-radius: 0px;
+    --font-primary: 'JetBrains Mono', monospace;
+    --font-size-base: 14.5px;
+    --shadow-window: 0 0 20px rgba(51, 255, 51, 0.15);
+    --checker-color-1: #030803;
+    --checker-color-2: #000000;
+    --desktop-pattern: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+                       linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+    --desktop-pattern-size: 100% 4px, 6px 100%;
+}
+
+/* --------------------------------------------------------------------------
+   2. RESET E REGOLE BASE DI INTERFACCIA
+   -------------------------------------------------------------------------- */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+/* Le schede devono poter essere trascinate (override del blocco globale sopra) */
+.tab-btn {
+    -webkit-user-drag: element;
+    cursor: grab;
+}
+
+.tab-btn:active {
+    cursor: grabbing;
+}
+
+body, html {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: var(--font-primary);
+    font-size: var(--font-size-base);
+    color: var(--text-main);
+    background-color: var(--bg-desktop);
+    font-weight: 500;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+#desktop {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+    background-color: var(--bg-desktop);
+    background-image: var(--desktop-pattern);
+    background-size: var(--desktop-pattern-size, 100% 100%);
+    transition: background 0.3s ease;
+}
+
+/* --------------------------------------------------------------------------
+   3. BARRA SUPERIORE (TOP BAR)
+   -------------------------------------------------------------------------- */
+#top-bar {
+    width: 100%;
+    height: 48px;
+    background-color: var(--bg-header);
+    border-bottom: 1px solid var(--border-window);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.3);
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 9999;
+    backdrop-filter: blur(12px);
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.logo-area {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.app-icon {
+    color: var(--accent-color);
+    filter: drop-shadow(0 0 4px rgba(var(--accent-color-rgb), 0.2));
+}
+
+.app-title {
+    font-weight: 700;
+    font-size: 1.15rem;
+    letter-spacing: 0.5px;
+}
+
+.app-tagline {
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    border-left: 1px solid var(--border-window);
+    padding-left: 10px;
+    margin-left: 5px;
+}
+
+.status-info {
+    display: flex;
+    gap: 16px;
+    font-size: 0.98rem;
+    color: var(--text-secondary);
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.25s ease;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.status-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.status-item strong {
+    color: var(--accent-color);
+    margin-left: 6px;
+    font-weight: 700;
+    text-shadow: 0 0 8px var(--accent-color);
+    filter: brightness(1.2);
+    letter-spacing: 0.5px;
+}
+
+/* --------------------------------------------------------------------------
+   4. FINESTRE FLUTTUANTI (WINDOW MANAGER ENGINE)
+   -------------------------------------------------------------------------- */
+.window {
+    position: absolute;
+    border-radius: var(--window-radius);
+    background-color: var(--bg-window);
+    border: 1px solid var(--border-window);
+    box-shadow: var(--shadow-window);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    backdrop-filter: blur(16px) saturate(150%);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, border-radius 0.3s ease, background-color 0.3s ease;
+    z-index: 100;
+}
+
+/* Effetto di lucentezza extra per il vetro liquido */
+:root.theme-cyber .window {
+    box-shadow: 0 25px 55px -10px rgba(0, 0, 0, 0.35), 
+                inset 0 1px 1px rgba(255, 255, 255, 0.2), 
+                0 0 2px rgba(255, 255, 255, 0.1);
+}
+
+.window.active-window {
+    border-color: var(--border-window-focus);
+    box-shadow: 0 20px 50px -5px rgba(0, 0, 0, 0.65), 
+                0 0 15px rgba(var(--accent-color-rgb), 0.15);
+}
+
+.window.minimized-window {
+    height: 38px !important;
+    min-height: 38px !important;
+}
+
+.window.minimized-window .window-content,
+.window.minimized-window .win-resize-handle-br,
+.window.minimized-window .win-resize-handle-bl,
+.window.minimized-window .win-resize-handle-tr,
+.window.minimized-window .win-resize-handle-tl {
+    display: none !important;
+}
+
+.window-header {
+    height: 38px;
+    min-height: 38px;
+    background-color: var(--bg-header);
+    border-bottom: 1px solid var(--border-window);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    cursor: move;
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.window-title {
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    font-size: 0.92rem;
+    text-transform: uppercase;
+    opacity: 0.95;
+}
+
+.window-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.win-btn {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    border: none;
+    background-color: rgba(255, 255, 255, 0.05);
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 14px;
+    transition: background-color 0.2s ease;
+}
+
+.win-btn:hover {
+    background-color: rgba(255, 255, 255, 0.15);
+}
+
+.win-pin.pinned-active {
+    background-color: rgba(var(--accent-color-rgb), 0.25) !important;
+    color: var(--accent-color) !important;
+    border: 1px solid rgba(var(--accent-color-rgb), 0.4) !important;
+}
+
+.win-pin.pinned-active:hover {
+    background-color: rgba(var(--accent-color-rgb), 0.4) !important;
+}
+
+.win-minimize:hover {
+    background-color: rgba(255, 85, 0, 0.4);
+    color: #fff;
+}
+
+.window-content {
+    flex-grow: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 14px;
+}
+
+.window-content.flex-column {
+    display: flex;
+    flex-direction: column;
+}
+
+.win-resize-handle-br, .win-resize-handle-bl,
+.win-resize-handle-tr, .win-resize-handle-tl {
+    width: 14px;
+    height: 14px;
+    position: absolute;
+    z-index: 101;
+    opacity: 0.3;
+    transition: opacity 0.2s;
+}
+
+.win-resize-handle-br:hover, .win-resize-handle-bl:hover,
+.win-resize-handle-tr:hover, .win-resize-handle-tl:hover {
+    opacity: 0.7;
+}
+
+.win-resize-handle-br {
+    bottom: 0; right: 0; cursor: nwse-resize;
+    background: linear-gradient(135deg, transparent 60%, var(--text-secondary) 60%);
+}
+.win-resize-handle-bl {
+    bottom: 0; left: 0; cursor: nesw-resize;
+    background: linear-gradient(225deg, transparent 60%, var(--text-secondary) 60%);
+}
+.win-resize-handle-tr {
+    top: 0; right: 0; cursor: nesw-resize;
+    background: linear-gradient(45deg, transparent 60%, var(--text-secondary) 60%);
+}
+.win-resize-handle-tl {
+    top: 0; left: 0; cursor: nwse-resize;
+    background: linear-gradient(315deg, transparent 60%, var(--text-secondary) 60%);
+}
+
+/* --------------------------------------------------------------------------
+   5. TAVOLA DA DISEGNO (CANVAS WORKSPACE)
+   -------------------------------------------------------------------------- */
+.canvas-workspace-wrapper {
+    padding: 0 !important;
+}
+
+.canvas-toolbar {
+    height: 36px;
+    background: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid var(--border-window);
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    gap: 6px;
+}
+
+.tool-btn-small {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-window);
+    color: var(--text-secondary);
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.tool-btn-small:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-main);
+    border-color: var(--text-secondary);
+}
+
+.tool-btn-small.active {
+    background: rgba(var(--accent-color-rgb), 0.12);
+    color: var(--accent-color);
+    border-color: var(--accent-color);
+}
+
+.separator {
+    width: 1px;
+    height: 16px;
+    background: var(--border-window);
+    margin: 0 4px;
+}
+
+.scroll-container {
+    flex-grow: 1;
+    overflow: auto;
+    position: relative;
+    background-color: transparent;
+}
+
+#canvas-viewport {
+    min-width: 100%;
+    min-height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 60px;
+}
+
+#canvas-border-shadow {
+    box-shadow: 0 25px 60px rgba(0,0,0,0.7);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Sfondo della Tavola (Scacchiera Trasparente) */
+#main-canvas {
+    display: block;
+    background-color: var(--checker-color-1);
+    background-image: 
+        linear-gradient(45deg, var(--checker-color-2) 25%, transparent 25%), 
+        linear-gradient(-45deg, var(--checker-color-2) 25%, transparent 25%), 
+        linear-gradient(45deg, transparent 75%, var(--checker-color-2) 75%), 
+        linear-gradient(-45deg, transparent 75%, var(--checker-color-2) 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+    image-rendering: pixelated;
+    transform-origin: center center;
+    transition: background-color 0.3s ease;
+}
+
+/* --------------------------------------------------------------------------
+   6. COMPONENTI DI FORM E CONTROLLI
+   -------------------------------------------------------------------------- */
+.control-group {
+    margin-bottom: 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    padding-bottom: 14px;
+}
+
+.control-group:last-child {
+    margin-bottom: 0;
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+label {
+    display: flex;
+    align-items: center;
+    font-weight: 700;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    font-size: 0.88rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    gap: 4px;
+}
+
+.small-label {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: none;
+    display: inline;
+}
+
+/* Input Fields */
+.input-row {
+    display: flex;
+    gap: 8px;
+}
+
+.input-row-3 {
+    display: flex;
+    gap: 6px;
+}
+
+.input-field {
+    display: flex;
+    align-items: center;
+    background-color: var(--text-input-bg);
+    border: 1px solid var(--text-input-border);
+    border-radius: 6px;
+    padding: 0 5px;
+    height: 30px;
+    flex-grow: 1;
+    transition: border-color 0.2s, background-color 0.2s;
+    gap: 2px;
+}
+
+.input-field:focus-within {
+    border-color: var(--accent-color);
+    background-color: rgba(0,0,0,0.1);
+}
+
+.input-field span {
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+    margin-right: 2px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.input-field svg {
+    color: var(--text-secondary);
+    opacity: 0.7;
+}
+
+.input-field input {
+    background: transparent;
+    border: none;
+    color: var(--text-main);
+    width: 100%;
+    height: 100%;
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    outline: none;
+    padding-left: 2px;
+    min-width: 20px;
+}
+
+.input-field input[type="number"]::-webkit-inner-spin-button,
+.input-field input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.select-field {
+    width: 100%;
+    height: 32px;
+    background-color: var(--text-input-bg);
+    border: 1px solid var(--text-input-border);
+    border-radius: 6px;
+    color: var(--text-main);
+    padding: 0 8px;
+    outline: none;
+    font-family: inherit;
+    transition: border-color 0.2s;
+}
+
+.select-field:focus {
+    border-color: var(--accent-color);
+}
+
+.select-field option {
+    background-color: var(--bg-window);
+    color: var(--text-main);
+}
+
+.text-input {
+    width: 100%;
+    height: 32px;
+    background-color: var(--text-input-bg);
+    border: 1px solid var(--text-input-border);
+    border-radius: 6px;
+    color: var(--text-main);
+    padding: 0 10px;
+    outline: none;
+    font-family: inherit;
+    transition: border-color 0.2s;
+}
+
+.text-input:focus {
+    border-color: var(--accent-color);
+}
+
+.checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.checkbox-row input[type="checkbox"] {
+    accent-color: var(--accent-color);
+    cursor: pointer;
+    width: 14px;
+    height: 14px;
+}
+
+/* File Dropzone */
+.file-dropzone {
+    border: 2px dashed var(--text-input-border);
+    border-radius: 8px;
+    padding: 20px 10px;
+    text-align: center;
+    cursor: pointer;
+    background-color: rgba(255, 255, 255, 0.01);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.25s ease-in-out;
+}
+
+.file-dropzone:hover, .file-dropzone.dragover {
+    border-color: var(--accent-color);
+    background-color: rgba(var(--accent-color-rgb), 0.03);
+    box-shadow: 0 0 10px rgba(var(--accent-color-rgb), 0.05);
+}
+
+.dropzone-text {
+    color: var(--text-secondary);
+    font-size: 0.92rem;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+/* Pulsanti */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    border: none;
+    font-family: inherit;
+    gap: 8px;
+}
+
+.btn-primary {
+    background-color: rgba(var(--accent-color-rgb), 0.1);
+    color: var(--accent-color);
+    border: 1px solid rgba(var(--accent-color-rgb), 0.25);
+}
+
+.btn-primary:hover {
+    background-color: rgba(var(--accent-color-rgb), 0.2);
+    border-color: var(--accent-color);
+}
+
+.btn-accent {
+    background-color: var(--accent-color);
+    color: #0b0f19;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(var(--accent-color-rgb), 0.15);
+}
+
+.btn-accent:hover {
+    background-color: var(--accent-color-hover);
+    box-shadow: 0 6px 16px rgba(var(--accent-color-rgb), 0.35);
+    transform: translateY(-1px);
+}
+
+.btn-secondary {
+    background-color: rgba(255, 255, 255, 0.04);
+    color: var(--text-main);
+    border: 1px solid var(--text-input-border);
+}
+
+.btn-secondary:hover {
+    background-color: rgba(255, 255, 255, 0.09);
+    border-color: var(--text-secondary);
+}
+
+.btn-danger {
+    background-color: rgba(239, 68, 68, 0.12);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.btn-danger:hover {
+    background-color: rgba(239, 68, 68, 0.22);
+    border-color: #ef4444;
+}
+
+.btn-block {
+    display: flex;
+    width: 100%;
+    margin-top: 6px;
+}
+
+.btn-sm {
+    padding: 5px 10px;
+    font-size: 0.88rem;
+}
+
+.flex-grow {
+    flex-grow: 1;
+}
+
+/* --------------------------------------------------------------------------
+   7. LISTA DEI LIVELLI (LAYERS)
+   -------------------------------------------------------------------------- */
+.layer-actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.layer-list-wrapper {
+    overflow-y: auto;
+    border: 1px solid var(--text-input-border);
+    border-radius: 6px;
+    background-color: var(--text-input-bg);
+    min-height: 100px;
+}
+
+.layer-list {
+    list-style: none;
+}
+
+.layer-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    cursor: pointer;
+    transition: background-color 0.15s, border-left-color 0.15s;
+}
+
+.layer-item:hover {
+    background-color: rgba(255, 255, 255, 0.02);
+}
+
+.layer-item.active-layer {
+    background-color: rgba(var(--accent-color-rgb), 0.06);
+    border-left: 3px solid var(--accent-color);
+}
+
+.layer-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    overflow: hidden;
+}
+
+.layer-thumbnail {
+    width: 26px;
+    height: 26px;
+    border-radius: 4px;
+    background-color: #0f1013;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.layer-thumbnail img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.layer-name {
+    font-weight: 600;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    font-size: 0.92rem;
+}
+
+.layer-visibility {
+    color: var(--text-secondary);
+    opacity: 0.6;
+    transition: opacity 0.15s, color 0.15s;
+}
+
+.layer-visibility:hover {
+    color: var(--text-main);
+    opacity: 1;
+}
+
+.layer-warning {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 30px 10px;
+    font-style: italic;
+    font-size: 0.92rem;
+}
+
+.disabled-content {
+    opacity: 0.35;
+    pointer-events: none;
+}
+
+/* --------------------------------------------------------------------------
+   8. FINESTRA DISEGNO MANUALE (MIGLIORATA ED INTUITIVA)
+   -------------------------------------------------------------------------- */
+.tool-btn-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.tool-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 64px;
+    border-radius: 6px;
+    border: 1px solid var(--text-input-border);
+    background-color: var(--text-input-bg);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    font-weight: 600;
+}
+
+.tool-btn svg {
+    color: var(--text-secondary);
+    opacity: 0.8;
+    transition: transform 0.2s, color 0.2s;
+}
+
+.tool-btn:hover {
+    background-color: rgba(255, 255, 255, 0.03);
+    color: var(--text-main);
+    border-color: var(--text-secondary);
+}
+
+.tool-btn.active {
+    background-color: rgba(var(--accent-color-rgb), 0.08);
+    border-color: var(--accent-color);
+    color: var(--text-main);
+    box-shadow: 0 0 10px rgba(var(--accent-color-rgb), 0.1),
+                inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+.tool-btn.active svg {
+    color: var(--accent-color);
+    transform: scale(1.15);
+    opacity: 1;
+}
+
+.tool-btn span {
+    font-size: 0.85rem;
+}
+
+/* --------------------------------------------------------------------------
+   9. PERSONALIZZAZIONE COLORI E TEMI
+   -------------------------------------------------------------------------- */
+.preset-theme-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+
+.theme-btn {
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid var(--text-input-border);
+    background: rgba(255, 255, 255, 0.01);
+    color: var(--text-main);
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-family: inherit;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.theme-btn:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: var(--text-secondary);
+}
+
+.theme-btn.active {
+    background-color: var(--accent-color);
+    color: #0c101b;
+    border-color: var(--accent-color);
+    font-weight: 600;
+    box-shadow: 0 0 10px rgba(var(--accent-color-rgb), 0.25);
+}
+
+.color-picker-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.color-picker-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    flex-grow: 1;
+}
+
+.color-picker-box span {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.color-picker-box input[type="color"] {
+    width: 100%;
+    height: 30px;
+    border: 1px solid var(--text-input-border);
+    border-radius: 6px;
+    cursor: pointer;
+    background: none;
+}
+
+.slider-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.slider-row input[type="range"] {
+    accent-color: var(--accent-color);
+    height: 4px;
+    border-radius: 2px;
+    background: var(--text-input-border);
+    outline: none;
+    cursor: pointer;
+}
+
+/* --------------------------------------------------------------------------
+   10. TIMELINE FRAME-BY-FRAME (SEQUENZA GIF)
+   -------------------------------------------------------------------------- */
+.timeline-workspace {
+    display: flex;
+    flex-direction: column;
+    padding: 0 !important;
+}
+
+.timeline-controls {
+    height: 38px;
+    background: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid var(--border-window);
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    gap: 10px;
+    overflow-x: auto;
+    white-space: nowrap;
+}
+
+.btn-group {
+    display: flex;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--border-window);
+}
+
+.btn-group .btn {
+    border-radius: 0;
+    border: none;
+}
+
+.separator-v {
+    width: 1px;
+    height: 18px;
+    background-color: var(--border-window);
+    margin: 0 2px;
+}
+
+.input-field-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.input-field-inline input, .input-field-inline select {
+    background-color: var(--text-input-bg);
+    border: 1px solid var(--text-input-border);
+    border-radius: 4px;
+    height: 24px;
+    color: var(--text-main);
+    padding: 0 6px;
+    outline: none;
+    font-family: inherit;
+    font-size: 0.9rem;
+}
+
+.select-field-sm {
+    height: 24px;
+    font-size: 0.88rem;
+}
+
+.frames-scroll-container {
+    flex-grow: 1;
+    overflow-x: auto;
+    overflow-y: hidden;
+    background-color: rgba(0,0,0,0.4);
+    padding: 8px;
+}
+
+.frames-track {
+    display: flex;
+    gap: 10px;
+    height: 100%;
+}
+
+.frame-thumbnail-card {
+    height: 100%;
+    aspect-ratio: 4/3;
+    background-color: var(--bg-window);
+    border: 1.5px solid var(--border-window);
+    border-radius: 6px;
+    position: relative;
+    cursor: pointer;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: all 0.2s ease;
+}
+
+.frame-thumbnail-card:hover {
+    border-color: rgba(var(--accent-color-rgb), 0.5);
+    transform: translateY(-2px);
+}
+
+.frame-thumbnail-card.active-frame {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 10px rgba(var(--accent-color-rgb), 0.3);
+}
+
+.frame-card-preview {
+    flex-grow: 1;
+    background-color: #111216;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+    background-image: 
+        linear-gradient(45deg, #1d1f27 25%, transparent 25%), 
+        linear-gradient(-45deg, #1d1f27 25%, transparent 25%), 
+        linear-gradient(45deg, transparent 75%, #1d1f27 75%), 
+        linear-gradient(-45deg, transparent 75%, #1d1f27 75%);
+    background-size: 12px 12px;
+    background-position: 0 0, 0 6px, 6px -6px, -6px 0px;
+}
+
+.frame-card-preview img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.frame-card-footer {
+    height: 22px;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 8px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    border-top: 1px solid var(--border-window);
+}
+
+.frame-card-footer span.frame-index {
+    font-weight: bold;
+    color: var(--text-main);
+}
+
+/* --------------------------------------------------------------------------
+   11. IL DOCK FLUTTUANTE (STILE macOS IN BASSO AL CENTRO)
+   -------------------------------------------------------------------------- */
+#quick-launcher.glass-dock {
+    position: absolute;
+    bottom: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: var(--bg-header);
+    border: 1.5px solid var(--border-window);
+    border-radius: 20px;
+    display: flex;
+    flex-direction: row;
+    gap: 12px;
+    padding: 8px 16px;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.5),
+                inset 0 1px 1px rgba(255, 255, 255, 0.08);
+    z-index: 10001;
+    backdrop-filter: blur(20px) saturate(160%);
+    transition: background-color 0.3s, border-color 0.3s, box-shadow 0.3s;
+}
+
+.launcher-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    border: 1px solid var(--border-window);
+    background-color: rgba(255, 255, 255, 0.02);
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.launcher-btn svg {
+    transition: transform 0.2s, color 0.2s;
+}
+
+.launcher-btn:hover {
+    background-color: rgba(var(--accent-color-rgb), 0.12);
+    color: var(--accent-color);
+    border-color: var(--accent-color);
+    transform: translateY(-6px) scale(1.12);
+    box-shadow: 0 8px 20px rgba(var(--accent-color-rgb), 0.2);
+}
+
+/* Indicatore di finestra aperta (pallino luminoso) */
+.launcher-btn.active-launcher::after {
+    content: '';
+    position: absolute;
+    bottom: 3px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background-color: var(--accent-color);
+    box-shadow: 0 0 6px var(--accent-color);
+    transition: background-color 0.3s, box-shadow 0.3s;
+}
+
+.launcher-btn.active-launcher {
+    border-color: rgba(var(--accent-color-rgb), 0.3);
+    background-color: rgba(var(--accent-color-rgb), 0.04);
+}
+
+/* --------------------------------------------------------------------------
+   12. SCROLLBARS E UTILITY
+   -------------------------------------------------------------------------- */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(var(--accent-color-rgb), 0.3);
+}
+
+.text-only-control {
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ==========================================================================
+   AGGIUNTE LAYOUT A SCHEDE, OPZIONI GOMMA E SOSTITUZIONE COLORE AVANZATO
+   ========================================================================== */
+
+/* Leggibilità Font e Spessore (Ottimizzazioni per Schermi a Bassa Risoluzione) */
+.window-title {
+    font-weight: 800 !important;
+    font-size: 0.98rem !important;
+    letter-spacing: 0.6px !important;
+}
+
+label {
+    font-weight: 800 !important;
+    font-size: 0.95rem !important;
+    color: var(--text-main) !important;
+    opacity: 0.95 !important;
+}
+
+.tab-btn {
+    font-weight: 800 !important;
+    font-size: 0.80rem !important;
+}
+
+.btn {
+    font-weight: 800 !important;
+}
+
+.input-field span {
+    font-weight: 700 !important;
+    color: var(--text-main) !important;
+}
+
+.input-field input {
+    font-weight: 700 !important;
+    font-size: 1.05rem !important;
+}
+
+.small-label {
+    font-weight: 700 !important;
+    font-size: 0.92rem !important;
+    color: var(--text-main) !important;
+}
+
+.launcher-btn {
+    font-weight: 700 !important;
+}
+
+/* Stili per le schede (Tabs) delle finestre */
+.window-tabs-header {
+    display: flex;
+    background: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid var(--border-window);
+    height: 34px;
+    flex-shrink: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: var(--text-secondary) transparent;
+}
+
+.window-tabs-header::-webkit-scrollbar {
+    height: 4px;
+}
+.window-tabs-header::-webkit-scrollbar-thumb {
+    background: var(--text-secondary);
+    border-radius: 4px;
+}
+
+.tab-btn {
+    flex: 0 0 auto;
+    min-width: max-content;
+    padding: 0 12px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+    outline: none;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.tab-btn:hover {
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.tab-btn.active {
+    color: var(--accent-color);
+    border-bottom-color: var(--accent-color);
+    background: rgba(var(--accent-color-rgb), 0.05);
+}
+
+.tab-content {
+    display: none;
+    height: 100%;
+}
+
+.tab-content.active-content {
+    display: block;
+}
+
+.window-content.flex-column .tab-content.active-content {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Opzioni della Gomma (Gomma Tratti vs Gomma Sfondo GIF) */
+.eraser-mode-options {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.eraser-mode-options .mode-btn {
+    flex: 1;
+    height: 36px;
+    border-radius: 6px;
+    border: 1px solid var(--text-input-border);
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.eraser-mode-options .mode-btn:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-main);
+}
+
+.eraser-mode-options .mode-btn.active {
+    background: rgba(var(--accent-color-rgb), 0.12);
+    color: var(--accent-color);
+    border-color: var(--accent-color);
+    box-shadow: 0 0 10px rgba(var(--accent-color-rgb), 0.2);
+}
+
+/* Contenitore e Item della Sostituzione Colori Globale */
+.replacements-container {
+    max-height: 150px;
+    overflow-y: auto;
+    border: 1px solid var(--text-input-border);
+    border-radius: 6px;
+    background: var(--text-input-bg);
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.replacement-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--text-input-border);
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-size: 0.85rem;
+    color: var(--text-main);
+    transition: background 0.15s ease;
+}
+
+.replacement-item:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.replacement-colors {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.replacement-color-swatch {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.replacement-color-arrow {
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.replacement-details {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.replacement-tolerance {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 700;
+}
+
+.replacement-btn-delete {
+    background: transparent;
+    border: none;
+    color: #f87171;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+}
+
+.replacement-btn-delete:hover {
+    background: rgba(239, 68, 68, 0.18);
+    color: #ef4444;
+}
+
+/* ==========================================================================
+   STILI AGGIUNTIVI PER PIPETTA, UNDO/REDO E LIVELLO DI RIFERIMENTO
+   ========================================================================== */
+.pipette-btn {
+    transition: all 0.2s ease-in-out;
+}
+.pipette-btn:hover {
+    color: var(--accent-color) !important;
+    transform: scale(1.15);
+}
+.pipette-btn.active-pipette {
+    color: var(--accent-color) !important;
+    animation: pipette-pulse 1s infinite alternate;
+}
+#btn-pick-chroma.active-pipette {
+    border-color: var(--accent-color) !important;
+    background-color: rgba(var(--accent-color-rgb), 0.15) !important;
+    color: var(--accent-color) !important;
+    box-shadow: 0 0 10px rgba(var(--accent-color-rgb), 0.25);
+}
+@keyframes pipette-pulse {
+    from { transform: scale(1); filter: drop-shadow(0 0 1px var(--accent-color)); }
+    to { transform: scale(1.2); filter: drop-shadow(0 0 4px var(--accent-color)); }
+}
+
+.win-btn[disabled] {
+    opacity: 0.3 !important;
+    cursor: not-allowed !important;
+    pointer-events: none;
+}
+
+/* ==========================================================================
+   STILI PER SELETTORE AMBITO MODIFICHE E PULSANTE PLAY PROMINENTE
+   ========================================================================== */
+
+.btn-play-prominent {
+    padding: 8px 18px !important;
+    font-size: 0.95rem !important;
+    height: auto !important;
+    font-weight: bold !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    border-radius: 6px !important;
+    box-shadow: 0 4px 12px rgba(var(--accent-color-rgb), 0.15) !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.btn-play-prominent svg {
+    width: 14px !important;
+    height: 14px !important;
+}
+
+.btn-play-prominent:hover {
+    transform: scale(1.06);
+    box-shadow: 0 6px 18px rgba(var(--accent-color-rgb), 0.3) !important;
+}
+
+.edit-scope-selector {
+    display: flex;
+    padding: 10px 14px;
+    background: rgba(0, 0, 0, 0.15);
+    border-bottom: 1px solid var(--border-window);
+    gap: 8px;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.scope-btn {
+    flex: 1;
+    height: 30px;
+    border-radius: 6px;
+    border: 1px solid var(--text-input-border);
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    outline: none;
+}
+
+.scope-btn:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-main);
+}
+
+.scope-btn.active {
+    background: rgba(var(--accent-color-rgb), 0.12);
+    color: var(--accent-color);
+    border-color: var(--accent-color);
+    box-shadow: 0 0 8px rgba(var(--accent-color-rgb), 0.2);
+}
+
+/* ======================================================================
+   STILI PER IL DOCKING DELLE SCHEDE (DOCKABLE TABS / PHOTOSHOP STYLE)
+   ====================================================================== */
+
+/* Tab Button trascinato (Ghost/Floating) */
+.tab-btn-ghost {
+    position: fixed;
+    pointer-events: none;
+    z-index: 10000;
+    opacity: 0.85;
+    background: var(--bg-window-header);
+    border: 1px solid var(--accent-color);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 10px rgba(var(--accent-color-rgb), 0.3);
+    border-radius: 6px;
+    padding: 6px 12px;
+    color: var(--text-main);
+    font-size: 0.82rem;
+    font-weight: 700;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transform: translate(-50%, -50%);
+}
+
+/* Indicatore di drop sopra la barra dei tab */
+.window-tabs-header.drag-over-tabs {
+    background: rgba(var(--accent-color-rgb), 0.15) !important;
+    border-bottom: 2px dashed var(--accent-color) !important;
+    transition: background 0.15s ease;
+}
+
+.window.drag-over-window {
+    outline: 2px dashed var(--accent-color);
+    outline-offset: -2px;
+    box-shadow: 0 0 0 1px rgba(var(--accent-color-rgb), 0.35), 0 8px 28px rgba(0, 0, 0, 0.45);
+}
+
+.window.drag-over-window .window-tabs-header {
+    background: rgba(var(--accent-color-rgb), 0.12) !important;
+}
+
+.window.drag-over-window .window-header {
+    background: rgba(var(--accent-color-rgb), 0.08);
+}
+
+/* Finestre fluttuanti create a runtime */
+.window.floating-window {
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    animation: windowAppear 0.2s cubic-bezier(0.1, 0.8, 0.2, 1);
+}
+
+@keyframes windowAppear {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Evidenzia il tab in trascinamento all'interno della sua barra originale */
+.tab-btn.tab-dragging {
+    opacity: 0.3;
+    border-style: dashed;
+}
+
+/* Migliora il tab header quando è vuoto */
+.window-tabs-header:empty {
+    height: 6px;
+    background: rgba(0,0,0,0.1);
+    border-bottom: 1px solid var(--border-window);
+}
+
+/* Pulsante per il percorso di estrazione personalizzato */
+#btn-select-export-dir {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 0.82rem;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--text-input-border);
+    color: var(--text-secondary);
+    border-radius: 6px;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    width: 100%;
+    margin-top: 6px;
+    font-family: inherit;
+    font-weight: 600;
+}
+
+#btn-select-export-dir:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--text-secondary);
+    color: var(--text-main);
+}
+
+#btn-select-export-dir.active-dir {
+    background: rgba(var(--accent-color-rgb), 0.08);
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+    box-shadow: 0 0 10px rgba(var(--accent-color-rgb), 0.25);
+}
+
+#btn-select-export-dir.active-dir:hover {
+    background: rgba(var(--accent-color-rgb), 0.15);
+    box-shadow: 0 0 14px rgba(var(--accent-color-rgb), 0.4);
+}
+
+/* Animazioni per il Banner di Aggiornamento */
+@keyframes bannerAppear {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -100px);
+    }
+    100% {
+        opacity: 1;
+        transform: translate(-50%, 0);
+    }
+}
+
+@keyframes bannerDisappear {
+    0% {
+        opacity: 1;
+        transform: translate(-50%, 0);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -100px);
+    }
+}
+
+/* Stile del Banner di Aggiornamento Premium (Vetro Scuro Sfocato con Accento Verde) */
+.update-banner {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translate(-50%, 0);
+    width: 90%;
+    max-width: 580px;
+    background: rgba(28, 30, 37, 0.85);
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    border: 1px solid rgba(var(--accent-color-rgb), 0.3);
+    border-radius: 12px;
+    padding: 16px 20px;
+    color: var(--text-main);
+    z-index: 100000;
+    box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.7), 
+                0 0 25px rgba(var(--accent-color-rgb), 0.15),
+                inset 0 1px 1px rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    animation: bannerAppear 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    transition: transform 0.4s ease, opacity 0.4s ease;
+}
+
+.update-banner.slide-out {
+    animation: bannerDisappear 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.update-banner-content {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-grow: 1;
+}
+
+.update-banner-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    background: rgba(var(--accent-color-rgb), 0.15);
+    color: var(--accent-color);
+    box-shadow: 0 0 10px rgba(var(--accent-color-rgb), 0.1);
+    flex-shrink: 0;
+}
+
+.update-banner-icon svg {
+    width: 22px;
+    height: 22px;
+    animation: pulse-glow 2s infinite alternate;
+}
+
+@keyframes pulse-glow {
+    0% { filter: drop-shadow(0 0 1px var(--accent-color)); }
+    100% { filter: drop-shadow(0 0 6px var(--accent-color)); }
+}
+
+.update-banner-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.update-banner-title {
+    font-weight: 700;
+    font-size: 0.95rem;
+    letter-spacing: 0.3px;
+}
+
+.update-banner-desc {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    line-height: 1.3;
+}
+
+.update-banner-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.update-banner-btn-download {
+    background: var(--accent-color);
+    color: #0b0f19 !important;
+    font-weight: 700;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 8px 14px;
+    border-radius: 6px;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(var(--accent-color-rgb), 0.2);
+    transition: all 0.2s ease;
+}
+
+.update-banner-btn-download:hover {
+    background: var(--accent-color-hover);
+    box-shadow: 0 6px 16px rgba(var(--accent-color-rgb), 0.4);
+    transform: translateY(-1px);
+}
+
+.update-banner-btn-close {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-secondary);
+    border: 1px solid var(--text-input-border);
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.update-banner-btn-close:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: var(--text-main);
+    border-color: var(--text-secondary);
+}
+
+
