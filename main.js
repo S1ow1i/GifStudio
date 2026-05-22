@@ -296,7 +296,7 @@ function createWindow() {
         minWidth: 1024,
         minHeight: 700,
         title: "Gif Studio",
-        icon: path.join(__dirname, 'icon.ico'),
+        icon: path.join(__dirname, 'icon.png'),
         autoHideMenuBar: true,
         show: !isTestMode,
         webPreferences: {
