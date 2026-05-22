@@ -24,10 +24,16 @@ document.addEventListener("DOMContentLoaded", () => {
         activeLayerId: null,
         
         // Strumento di disegno in uso
-        activeTool: "select", // "select" (sposta), "brush" (pennello), "eraser" (gomma), "picker" (copia colore)
+        activeTool: "select", // "select" (sposta), "brush" (pennello), "eraser" (gomma), "picker" (copia colore), "magic_wand"
         eraserMode: "brush", // "brush" (tratti) o "gif" (pixel sfondo GIF)
-        editScope: "frame",  // "frame" (singolo frame) o "global" (tutta la GIF)
+        editScope: "local", // "local" (solo frame corrente) o "global" (tutta la gif)
         colorReplacements: [], // lista sostituzioni globali
+        magicWandTolerance: 20,
+        protectionMask: null, // Maschera di protezione calcolata dalla bacchetta magica
+        history: {
+            past: [],
+            future: []
+        },
         brush: {
             size: 5,
             color: "#00ffcc",
@@ -260,6 +266,7 @@ document.addEventListener("DOMContentLoaded", () => {
         drawBrush: document.getElementById("draw-tool-brush"),
         drawEraser: document.getElementById("draw-tool-eraser"),
         drawPicker: document.getElementById("draw-tool-picker"),
+        drawMagicWand: document.getElementById("draw-tool-magic-wand"),
         brushSettings: document.getElementById("brush-settings-group"),
         brushSize: document.getElementById("brush-size"),
         brushColor: document.getElementById("brush-color"),
@@ -329,6 +336,10 @@ document.addEventListener("DOMContentLoaded", () => {
         eraserModeGroup: document.getElementById("eraser-mode-group"),
         eraserModeBrush: document.getElementById("eraser-mode-brush"),
         eraserModeGif: document.getElementById("eraser-mode-gif"),
+        magicWandSettingsGroup: document.getElementById("magic-wand-settings-group"),
+        magicWandTolerance: document.getElementById("magic-wand-tolerance"),
+        magicWandToleranceText: document.getElementById("magic-wand-tolerance-text"),
+        btnRemoveProtectionMask: document.getElementById("btn-remove-protection-mask"),
         replaceColorFrom: document.getElementById("replace-color-from"),
         replaceColorTo: document.getElementById("replace-color-to"),
         replaceColorTolerance: document.getElementById("replace-color-tolerance"),
@@ -3923,6 +3934,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 ctx.drawImage(layer.drawingCanvas, -layer.w / 2, -layer.h / 2, layer.w, layer.h);
             }
 
+            // Disegna maschera di protezione (visiva)
+            if (layer.protectionMask) {
+                ctx.save();
+                ctx.globalAlpha = 0.4;
+                ctx.drawImage(layer.protectionMask, -layer.w / 2, -layer.h / 2, layer.w, layer.h);
+                ctx.restore();
+            }
+
             // Disegna rettangolo di selezione in modalità select
             if (layer.id === state.activeLayerId && state.activeTool === "select") {
                 ctx.strokeStyle = varColorToHex("--accent-color", "#00ffcc");
@@ -3990,7 +4009,8 @@ document.addEventListener("DOMContentLoaded", () => {
             { btn: dom.drawSelect, name: "select" },
             { btn: dom.drawBrush, name: "brush" },
             { btn: dom.drawEraser, name: "eraser" },
-            { btn: dom.drawPicker, name: "picker" }
+            { btn: dom.drawPicker, name: "picker" },
+            { btn: dom.drawMagicWand, name: "magic_wand" }
         ];
 
         tools.forEach(t => {
@@ -4010,6 +4030,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 } else {
                     dom.eraserModeGroup.style.display = "none";
                 }
+
+                if (t.name === "magic_wand") {
+                    dom.magicWandSettingsGroup.style.display = "block";
+                } else {
+                    dom.magicWandSettingsGroup.style.display = "none";
+                }
+
                 requestRender();
             });
         });
@@ -4034,6 +4061,16 @@ document.addEventListener("DOMContentLoaded", () => {
         dom.brushHardness.addEventListener("input", (e) => {
             state.brush.hardness = parseInt(e.target.value);
             dom.brushHardnessText.innerText = `${state.brush.hardness}%`;
+        });
+
+        dom.magicWandTolerance.addEventListener("input", (e) => {
+            state.magicWandTolerance = parseInt(e.target.value);
+            dom.magicWandToleranceText.innerText = `${state.magicWandTolerance}%`;
+        });
+
+        dom.btnRemoveProtectionMask.addEventListener("click", () => {
+            state.frames.forEach(f => f.layers.forEach(l => l.protectionMask = null));
+            requestRender();
         });
 
         function activatePipette(target, btnElement) {
@@ -4170,6 +4207,13 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
+        if (state.activeTool === "magic_wand") {
+            const localCoords = mapGlobalToLayerCoords(coords.x, coords.y, layer);
+            saveState();
+            applyMagicWand(layer, localCoords.x, localCoords.y);
+            return;
+        }
+
         // INIBIZIONE PENNELLO E GOMMA SU LIVELLI BLOCCATI
         if (layer.locked) {
             return;
@@ -4223,7 +4267,147 @@ document.addEventListener("DOMContentLoaded", () => {
         return { x: lx, y: ly };
     }
 
+    function floodFillMask(ctx, startX, startY, width, height, tolerance) {
+        const imgData = ctx.getImageData(0, 0, width, height);
+        const data = imgData.data;
+        const maskCanvas = document.createElement("canvas");
+        maskCanvas.width = width;
+        maskCanvas.height = height;
+        const maskCtx = maskCanvas.getContext("2d");
+        const maskData = maskCtx.createImageData(width, height);
+        const mData = maskData.data;
+
+        startX = Math.floor(startX);
+        startY = Math.floor(startY);
+        if (startX < 0 || startX >= width || startY < 0 || startY >= height) return maskCanvas;
+
+        const startPos = (startY * width + startX) * 4;
+        const startR = data[startPos];
+        const startG = data[startPos+1];
+        const startB = data[startPos+2];
+        const startA = data[startPos+3];
+
+        if (startA === 0) return maskCanvas; // Nessun pixel da proteggere
+
+        const maxDiff = (tolerance / 100) * 765; 
+
+        function colorMatch(pos) {
+            const r = data[pos];
+            const g = data[pos+1];
+            const b = data[pos+2];
+            const a = data[pos+3];
+            if (a === 0) return false;
+            return (Math.abs(r - startR) + Math.abs(g - startG) + Math.abs(b - startB)) <= maxDiff;
+        }
+
+        const stack = [startX, startY];
+        const visited = new Uint8Array(width * height);
+
+        while (stack.length > 0) {
+            const y = stack.pop();
+            const x = stack.pop();
+            let lx = x;
+
+            while (lx >= 0 && colorMatch((y * width + lx) * 4) && !visited[y * width + lx]) {
+                lx--;
+            }
+            lx++;
+            
+            let spanAbove = false;
+            let spanBelow = false;
+
+            while (lx < width && colorMatch((y * width + lx) * 4) && !visited[y * width + lx]) {
+                const idx = y * width + lx;
+                const pos = idx * 4;
+                
+                visited[idx] = 1;
+                mData[pos] = 255;
+                mData[pos+1] = 0;
+                mData[pos+2] = 0;
+                mData[pos+3] = 255; // Maschera protettiva rossa solida
+
+                if (y > 0) {
+                    if (colorMatch(((y - 1) * width + lx) * 4) && !visited[(y - 1) * width + lx]) {
+                        if (!spanAbove) {
+                            stack.push(lx, y - 1);
+                            spanAbove = true;
+                        }
+                    } else if (spanAbove) {
+                        spanAbove = false;
+                    }
+                }
+                if (y < height - 1) {
+                    if (colorMatch(((y + 1) * width + lx) * 4) && !visited[(y + 1) * width + lx]) {
+                        if (!spanBelow) {
+                            stack.push(lx, y + 1);
+                            spanBelow = true;
+                        }
+                    } else if (spanBelow) {
+                        spanBelow = false;
+                    }
+                }
+                lx++;
+            }
+        }
+        
+        maskCtx.putImageData(maskData, 0, 0);
+        return maskCanvas;
+    }
+
+    function applyMagicWand(layer, localX, localY, isPropagation = false) {
+        const tempCanvas = document.createElement("canvas");
+        tempCanvas.width = layer.w;
+        tempCanvas.height = layer.h;
+        const tCtx = tempCanvas.getContext("2d");
+        
+        if (layer.type === "image" && layer.img) {
+            if (layer.canvasImage) {
+                tCtx.drawImage(layer.canvasImage, 0, 0, layer.w, layer.h);
+            } else {
+                tCtx.drawImage(layer.img, 0, 0, layer.w, layer.h);
+            }
+        }
+        if (layer.drawingCanvas) {
+            tCtx.drawImage(layer.drawingCanvas, 0, 0, layer.w, layer.h);
+        }
+
+        const newMask = floodFillMask(tCtx, localX, localY, layer.w, layer.h, state.magicWandTolerance);
+        if (layer.protectionMask) {
+            const mCtx = layer.protectionMask.getContext("2d");
+            mCtx.drawImage(newMask, 0, 0);
+        } else {
+            layer.protectionMask = newMask;
+        }
+
+        if (state.editScope === "global" && !isPropagation) {
+            state.frames.forEach(frame => {
+                let targetLayer = frame.layers.find(l => l.id === layer.id);
+                if (!targetLayer) {
+                    const activeFrame = getActiveFrame();
+                    if (activeFrame) {
+                        const activeLayerIndex = activeFrame.layers.findIndex(l => l.id === layer.id);
+                        if (activeLayerIndex !== -1 && activeLayerIndex < frame.layers.length) {
+                            targetLayer = frame.layers[activeLayerIndex];
+                        }
+                    }
+                }
+                if (targetLayer && targetLayer !== layer) {
+                    applyMagicWand(targetLayer, localX, localY, true);
+                }
+            });
+        }
+        requestRender();
+    }
+
     function drawPoint(x, y, layer, isPropagation = false) {
+        let tempCanvas = null, tCtx = null;
+        if (layer.protectionMask) {
+            tempCanvas = document.createElement("canvas");
+            tempCanvas.width = layer.w;
+            tempCanvas.height = layer.h;
+            tCtx = tempCanvas.getContext("2d");
+        }
+
         if (state.activeTool === "eraser" && state.eraserMode === "gif" && layer.type === "image") {
             if (!layer.canvasImage && layer.img) {
                 layer.canvasImage = document.createElement("canvas");
@@ -4239,13 +4423,27 @@ document.addEventListener("DOMContentLoaded", () => {
                 const canvasY = y * scaleY;
                 const brushSize = state.brush.size * scaleX;
 
-                const imgCtx = layer.canvasImage.getContext("2d");
-                imgCtx.save();
-                imgCtx.globalCompositeOperation = "destination-out";
-                imgCtx.beginPath();
-                imgCtx.arc(canvasX, canvasY, brushSize / 2, 0, Math.PI * 2);
-                imgCtx.fill();
-                imgCtx.restore();
+                if (tempCanvas) {
+                    tCtx.beginPath();
+                    tCtx.arc(canvasX, canvasY, brushSize / 2, 0, Math.PI * 2);
+                    tCtx.fill();
+                    tCtx.globalCompositeOperation = "destination-out";
+                    tCtx.drawImage(layer.protectionMask, 0, 0, layer.w, layer.h);
+
+                    const imgCtx = layer.canvasImage.getContext("2d");
+                    imgCtx.save();
+                    imgCtx.globalCompositeOperation = "destination-out";
+                    imgCtx.drawImage(tempCanvas, 0, 0, layer.canvasImage.width, layer.canvasImage.height);
+                    imgCtx.restore();
+                } else {
+                    const imgCtx = layer.canvasImage.getContext("2d");
+                    imgCtx.save();
+                    imgCtx.globalCompositeOperation = "destination-out";
+                    imgCtx.beginPath();
+                    imgCtx.arc(canvasX, canvasY, brushSize / 2, 0, Math.PI * 2);
+                    imgCtx.fill();
+                    imgCtx.restore();
+                }
 
                 filterCache.clear();
                 requestRender();
@@ -4253,18 +4451,35 @@ document.addEventListener("DOMContentLoaded", () => {
         } else {
             const dCtx = layer.drawingCanvas.getContext("2d");
             
-            dCtx.save();
-            if (state.activeTool === "eraser") {
-                dCtx.globalCompositeOperation = "destination-out";
-            } else {
-                dCtx.globalCompositeOperation = "source-over";
-                dCtx.fillStyle = state.brush.color;
-            }
+            if (tempCanvas) {
+                tCtx.fillStyle = state.brush.color;
+                tCtx.beginPath();
+                tCtx.arc(x, y, state.brush.size / 2, 0, Math.PI * 2);
+                tCtx.fill();
+                tCtx.globalCompositeOperation = "destination-out";
+                tCtx.drawImage(layer.protectionMask, 0, 0, layer.w, layer.h);
 
-            dCtx.beginPath();
-            dCtx.arc(x, y, state.brush.size / 2, 0, Math.PI * 2);
-            dCtx.fill();
-            dCtx.restore();
+                dCtx.save();
+                if (state.activeTool === "eraser") {
+                    dCtx.globalCompositeOperation = "destination-out";
+                } else {
+                    dCtx.globalCompositeOperation = "source-over";
+                }
+                dCtx.drawImage(tempCanvas, 0, 0, layer.w, layer.h);
+                dCtx.restore();
+            } else {
+                dCtx.save();
+                if (state.activeTool === "eraser") {
+                    dCtx.globalCompositeOperation = "destination-out";
+                } else {
+                    dCtx.globalCompositeOperation = "source-over";
+                    dCtx.fillStyle = state.brush.color;
+                }
+                dCtx.beginPath();
+                dCtx.arc(x, y, state.brush.size / 2, 0, Math.PI * 2);
+                dCtx.fill();
+                dCtx.restore();
+            }
             requestRender();
         }
 
@@ -4302,6 +4517,14 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function drawSegment(x1, y1, x2, y2, layer, isPropagation = false) {
+        let tempCanvas = null, tCtx = null;
+        if (layer.protectionMask) {
+            tempCanvas = document.createElement("canvas");
+            tempCanvas.width = layer.w;
+            tempCanvas.height = layer.h;
+            tCtx = tempCanvas.getContext("2d");
+        }
+
         if (state.activeTool === "eraser" && state.eraserMode === "gif" && layer.type === "image") {
             if (!layer.canvasImage && layer.img) {
                 layer.canvasImage = document.createElement("canvas");
@@ -4319,18 +4542,36 @@ document.addEventListener("DOMContentLoaded", () => {
                 const canvasY2 = y2 * scaleY;
                 const brushSize = state.brush.size * scaleX;
 
-                const imgCtx = layer.canvasImage.getContext("2d");
-                imgCtx.save();
-                imgCtx.globalCompositeOperation = "destination-out";
-                imgCtx.lineWidth = brushSize;
-                imgCtx.lineCap = "round";
-                imgCtx.lineJoin = "round";
-                imgCtx.strokeStyle = "rgba(0,0,0,1)";
-                imgCtx.beginPath();
-                imgCtx.moveTo(canvasX1, canvasY1);
-                imgCtx.lineTo(canvasX2, canvasY2);
-                imgCtx.stroke();
-                imgCtx.restore();
+                if (tempCanvas) {
+                    tCtx.lineWidth = brushSize;
+                    tCtx.lineCap = "round";
+                    tCtx.lineJoin = "round";
+                    tCtx.beginPath();
+                    tCtx.moveTo(canvasX1, canvasY1);
+                    tCtx.lineTo(canvasX2, canvasY2);
+                    tCtx.stroke();
+                    tCtx.globalCompositeOperation = "destination-out";
+                    tCtx.drawImage(layer.protectionMask, 0, 0, layer.w, layer.h);
+
+                    const imgCtx = layer.canvasImage.getContext("2d");
+                    imgCtx.save();
+                    imgCtx.globalCompositeOperation = "destination-out";
+                    imgCtx.drawImage(tempCanvas, 0, 0, layer.canvasImage.width, layer.canvasImage.height);
+                    imgCtx.restore();
+                } else {
+                    const imgCtx = layer.canvasImage.getContext("2d");
+                    imgCtx.save();
+                    imgCtx.globalCompositeOperation = "destination-out";
+                    imgCtx.lineWidth = brushSize;
+                    imgCtx.lineCap = "round";
+                    imgCtx.lineJoin = "round";
+                    imgCtx.strokeStyle = "rgba(0,0,0,1)";
+                    imgCtx.beginPath();
+                    imgCtx.moveTo(canvasX1, canvasY1);
+                    imgCtx.lineTo(canvasX2, canvasY2);
+                    imgCtx.stroke();
+                    imgCtx.restore();
+                }
 
                 filterCache.clear();
                 requestRender();
@@ -4338,24 +4579,47 @@ document.addEventListener("DOMContentLoaded", () => {
         } else {
             const dCtx = layer.drawingCanvas.getContext("2d");
             
-            dCtx.save();
-            dCtx.lineWidth = state.brush.size;
-            dCtx.lineCap = "round";
-            dCtx.lineJoin = "round";
+            if (tempCanvas) {
+                tCtx.lineWidth = state.brush.size;
+                tCtx.lineCap = "round";
+                tCtx.lineJoin = "round";
+                tCtx.strokeStyle = state.brush.color;
+                tCtx.beginPath();
+                tCtx.moveTo(x1, y1);
+                tCtx.lineTo(x2, y2);
+                tCtx.stroke();
+                
+                tCtx.globalCompositeOperation = "destination-out";
+                tCtx.drawImage(layer.protectionMask, 0, 0, layer.w, layer.h);
 
-            if (state.activeTool === "eraser") {
-                dCtx.globalCompositeOperation = "destination-out";
-                dCtx.strokeStyle = "rgba(0,0,0,1)";
+                dCtx.save();
+                if (state.activeTool === "eraser") {
+                    dCtx.globalCompositeOperation = "destination-out";
+                } else {
+                    dCtx.globalCompositeOperation = "source-over";
+                }
+                dCtx.drawImage(tempCanvas, 0, 0, layer.w, layer.h);
+                dCtx.restore();
             } else {
-                dCtx.globalCompositeOperation = "source-over";
-                dCtx.strokeStyle = state.brush.color;
-            }
+                dCtx.save();
+                dCtx.lineWidth = state.brush.size;
+                dCtx.lineCap = "round";
+                dCtx.lineJoin = "round";
 
-            dCtx.beginPath();
-            dCtx.moveTo(x1, y1);
-            dCtx.lineTo(x2, y2);
-            dCtx.stroke();
-            dCtx.restore();
+                if (state.activeTool === "eraser") {
+                    dCtx.globalCompositeOperation = "destination-out";
+                    dCtx.strokeStyle = "rgba(0,0,0,1)";
+                } else {
+                    dCtx.globalCompositeOperation = "source-over";
+                    dCtx.strokeStyle = state.brush.color;
+                }
+
+                dCtx.beginPath();
+                dCtx.moveTo(x1, y1);
+                dCtx.lineTo(x2, y2);
+                dCtx.stroke();
+                dCtx.restore();
+            }
             requestRender();
         }
 
@@ -4552,8 +4816,9 @@ document.addEventListener("DOMContentLoaded", () => {
                         keyframes: {}
                     };
                     addLayer(newLayer);
-                    // Ricalcola auto-zoom
+                    // Ricalcola auto-zoom e centra la vista sull'immagine importata
                     autoZoomToFit(state.canvasWidth, state.canvasHeight);
+                    setTimeout(centerCanvas, 80);
                 };
                 img.src = e.target.result;
             };
@@ -4613,6 +4878,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     dom.drawSelect.click();
                 }
                 autoZoomToFit(state.canvasWidth, state.canvasHeight);
+                setTimeout(centerCanvas, 80);
             };
             reader.readAsArrayBuffer(file);
         } else {
@@ -4662,8 +4928,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (state.activeTool !== "select") {
                         dom.drawSelect.click();
                     }
-                    // Ricalcola auto-zoom
+                    // Ricalcola auto-zoom e centra la vista
                     autoZoomToFit(state.canvasWidth, state.canvasHeight);
+                    setTimeout(centerCanvas, 80);
                 };
                 img.src = e.target.result;
             };
@@ -4791,8 +5058,9 @@ document.addEventListener("DOMContentLoaded", () => {
             
             dom.statusFramesCount.innerText = `1/${state.frames.length}`;
             
-            // Auto zoom del canvas all'importazione
+            // Auto zoom del canvas all'importazione e centra la vista
             autoZoomToFit(gifWidth, gifHeight);
+            setTimeout(centerCanvas, 100);
 
         } catch (err) {
             console.error("Errore durante il caricamento della GIF animata:", err);
@@ -6689,5 +6957,315 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    function initTabOrderSystem() {
+        const orderInputs = document.querySelectorAll('.tab-order-input');
+        
+        let savedOrders = {};
+        try {
+            if (localStorage.getItem("tabOrders")) {
+                savedOrders = JSON.parse(localStorage.getItem("tabOrders"));
+            }
+        } catch (e) {}
+
+        orderInputs.forEach(input => {
+            const targetTabId = input.getAttribute('data-target');
+            const tabBtn = document.querySelector(`.tab-btn[data-tab="${targetTabId}"]`);
+            
+            if (tabBtn) {
+                if (savedOrders[targetTabId]) {
+                    input.value = savedOrders[targetTabId];
+                    tabBtn.style.order = savedOrders[targetTabId];
+                } else {
+                    tabBtn.style.order = input.value;
+                }
+                
+                input.addEventListener('change', function() {
+                    let val = parseInt(this.value);
+                    if (isNaN(val) || val < 1) val = 1;
+                    this.value = val;
+                    
+                    tabBtn.style.order = val;
+                    
+                    savedOrders[targetTabId] = val;
+                    localStorage.setItem("tabOrders", JSON.stringify(savedOrders));
+                });
+            }
+        });
+    }
+
+
+    function initInteractiveTutorial() {
+        const btnTutorial = document.getElementById("btn-tutorial-mode");
+        const tooltip = document.getElementById("tutorial-tooltip");
+        let isTutorialMode = false;
+        
+        const tutorialDict = {
+            // GLOBALI E HEADER
+            "btn-tutorial-mode": "Pulsante Aiuto: Attiva o disattiva questa modalità per scoprire a cosa servono i vari strumenti.",
+            "btn-default-layout": "Posizione di Default: Clicca qui se hai perso o chiuso qualche finestra per farle tornare tutte al loro posto originale.",
+            "quick-launcher": "Isola di Comando: Usa questi pulsantini luminosi qui in alto per far apparire o scomparire rapidamente i blocchi dello schermo (Tavola, Progetto, Filtri, Timeline). Se non trovi più una finestra, clicca l'icona qua su!",
+            "tut-status-canvas": "Info Tavola: Ti ricorda in ogni momento quanto è grande (in pixel) l'immagine finale che stai creando.",
+            "tut-status-layer": "Info Livello: Mostra il nome del pezzo (livello) che hai attualmente selezionato.",
+            "tut-status-frames": "Info Animazione: Ti dice quale fotogramma (frame) stai guardando rispetto al totale dell'animazione.",
+            
+            // FINESTRE PRINCIPALI E SOTTOCARTELLE
+            "win-canvas": "Tavola da Disegno: Questa è l'area principale dove crei la tua GIF. Tutto ciò che vedi qui sarà nel risultato finale.",
+            "win-project": "Pannello Progetto: Contiene tutte le schede per caricare immagini, cambiare i colori del programma e gestire la lista dei livelli.",
+            "win-properties": "Pannello Strumenti: La tua cassetta degli attrezzi! Qui trovi gomme, pennelli, regolazioni XYZ ed effetti green-screen.",
+            "win-timeline": "Pannello Animazione (Timeline): Lo studio di regia. Qui in basso gestisci lo scorrere del tempo e dei fotogrammi.",
+            "tut-title-canvas-size": "Grandezza Tavola: Usa questi campi per decidere quanto sarà grande in pixel il video o la GIF che stai creando.",
+            "tut-title-themes": "Temi: Ti permette di scegliere uno stile preimpostato (chiaro, scuro, colorato) per cambiare l'aspetto del programma.",
+            "tut-title-custom-colors": "Colori Personalizzati: Ti permette di colorare ogni singolo pezzo del programma come preferisci.",
+            "tut-title-fonts": "Scrittura e Angoli: Da qui puoi ingrandire i testi del programma, cambiare font e arrotondare i bordi.",
+            "tut-title-tools": "Scegli Strumento: Seleziona tra cursore normale, pennello per disegnare o maschera bacchetta magica.",
+            "tut-title-magic-wand": "Bacchetta Magica: Controlla quanto la bacchetta sarà sensibile ai colori simili.",
+            "tut-title-eraser": "Gomma: Scegli se vuoi cancellare quello che hai disegnato tu, oppure bucare l'immagine originale come una vera gomma.",
+            "tut-title-brush": "Impostazioni Pennello/Gomma: Regola quanto sarà grande e sfumato il tuo tratto.",
+            "tut-title-xyz": "Posizione XYZ: Permette di muovere l'immagine avanti, indietro, o a destra e sinistra con precisione millimetrica.",
+            "tut-title-bg-transparent": "Trasparenza Colore: Clicca su un colore dell'immagine per bucarlo come fosse un green-screen.",
+            "tut-title-bg-auto": "Trasparenza Automatica: Cerca di rimuovere in automatico lo sfondo esterno attorno all'immagine.",
+            "tut-title-replace-color": "Sostituisci Colore: Trasforma magicamente tutti i pixel di un certo colore in un altro colore in tutta la GIF.",
+            
+            // TAVOLA DA DISEGNO
+            "btn-zoom-out": "Riduci: Rimpicciolisce la vista della tavola da disegno per farti vedere il quadro generale.",  
+            // TEMI E STILE
+            "tab-project-style": "Temi & Stile: Personalizza l'aspetto visivo del programma per non affaticare gli occhi.",
+            "theme-dark": "Tema Grigio: Il classico tema scuro professionale.",
+            "theme-cyber": "Tema Vetro: Tema moderno in stile Cyberpunk.",
+            "theme-terminal": "Tema Marmo Nero: Tema ultra scuro per riposare la vista.",
+            "theme-light": "Tema Chiaro: Tema bianco brillante come un foglio di carta.",
+            "theme-concrete": "Tema Cemento: Tema minimal grigio chiaro.",
+            "theme-retro": "Tema Retro: Verde e nero come i vecchi terminali.",
+            "ui-color-bg": "Colore Sfondo: Scegli il colore dello sfondo dell'intero schermo del programma.",
+            "ui-color-win": "Colore Finestre: Scegli il colore interno dei pannelli.",
+            "ui-color-text": "Colore Testo: Scegli il colore delle scritte del programma.",
+            "ui-color-accent": "Colore Accento: Scegli il colore dei pulsanti luminosi.",
+            "ui-font-family": "Tipo Carattere: Cambia lo stile delle scritte di tutto il programma.",
+            "ui-font-size": "Grandezza Carattere: Ingrandisci o rimpicciolisci i testi dell'interfaccia.",
+            "ui-window-radius": "Angoli Finestre: Sposta la levetta per avere finestre quadrate o smussate.",
+            
+            // LISTA LIVELLI
+            "tab-project-layers": "Lista Livelli: I livelli sono come fogli di carta sovrapposti. Qui vedi tutti i pezzi del tuo disegno.",
+            "btn-delete-layer": "Elimina Livello: Seleziona un livello dalla lista qui sotto e clicca questo pulsante per eliminarlo definitivamente.",
+            "layer-list": "La tua lista dei livelli. Clicca sul nome di un livello per selezionarlo. Clicca sull'Occhio per nasconderlo temporaneamente.",
+            
+            // AMBITO MODIFICA
+            "btn-scope-frame": "Modalità Solo Frame: Se attivo, quando disegni, sposti o cancelli, la modifica avverrà SOLO nel fotogramma (frame) che stai guardando adesso. Ottimo per le animazioni a passo uno.",
+            "btn-scope-global": "Modalità Tutta la GIF: Se attivo, qualsiasi modifica farai (come spostare un oggetto o cancellare), questa apparirà in tutti i fotogrammi del video contemporaneamente!",
+            
+            // STRUMENTI DI DISEGNO (PANNELLO CENTRALE/DESTRO)
+            "draw-tool-select": "Sposta Oggetto: Usa questo strumento per acchiappare i livelli nel disegno e spostarli col mouse, oppure usa i loro bordi rossi per ingrandirli e rimpicciolirli.",
+            "draw-tool-brush": "Pennello: Lo strumento classico per colorare e disegnare a mano libera.",
+            "brush-color": "Colore Pennello: Scegli di che colore vuoi disegnare.",
+            "brush-size": "Grandezza Tratto: Sposta la levetta per fare un pennello gigante o un pennellino fine per i dettagli.",
+            
+            "draw-tool-eraser": "Gomma: Passala sul disegno per cancellare i colori o fare dei buchi per far vedere lo sfondo trasparente.",
+            "eraser-mode-brush": "Gomma Pennello: Cancella solo i tratti che hai disegnato tu a mano.",
+            "eraser-mode-gif": "Gomma Sfondo: Modalità estrema! Passa la gomma sopra le foto o la GIF importata per bucarle letteralmente e renderle trasparenti.",
+            
+            "draw-tool-magic-wand": "Bacchetta Magica: Lo strumento definitivo. Clicca su un punto dell'immagine per circondarlo con una maschera protettiva rossa. Quel colore sarà protetto. Puoi cliccare in giro per sommare le zone protette!",
+            "btn-remove-protection-mask": "Rimuovi Maschera: Clicca qui per disattivare la magia e sbloccare tutte le zone rosse protette.",
+            "magic-wand-tolerance": "Tolleranza Magica: Aumentala se vuoi che la bacchetta magica protegga anche i pixel leggermente più scuri o più chiari del colore che hai cliccato.",
+            
+            "draw-tool-picker": "Copia Colore (Pipetta): Clicca un punto sul disegno per 'rubare' quel colore e metterlo subito nel tuo pennello.",
+            "btn-add-text-layer": "Scritta: Aggiungi un blocco di scritte. Potrai poi spostarlo e ingrandirlo.",
+            
+            // SFONDO TRASPARENTE (GREEN SCREEN)
+            "tab-prop-bg": "Sfondo Trasparente: Usa quest'area per trasformare le tue immagini rendendo trasparenti i colori di sfondo, come un green-screen televisivo.",
+            "btn-pick-transparency-color": "Pipetta Trasparenza: 1) Clicca questo tasto 2) poi clicca sul disegno il colore esatto che vuoi bucare.",
+            "transparency-tolerance": "Tolleranza: Se lo sfondo ha difetti o sfumature simili, aumenta questo valore per fargli catturare ed eliminare più pixel simili al colore che hai scelto.",
+            "transparency-match-type": "Tipo Area: 'Area Unita' toglie il colore solo se i pixel si toccano tra loro. 'Globale' toglie quel colore ovunque, anche in macchie lontane nella foto.",
+            "btn-add-transparency-rule": "Aggiungi Trasparenza: Premi questo pulsante per confermare ed eliminare il colore. L'effetto sarà perfetto e pulito!",
+            
+            // SOSTITUISCI COLORE
+            "tab-prop-colors": "Sostituzione Colore: Quest'area ti permette di cambiare i colori di una foto in modo automatico. (Es: cambiare una maglietta da blu a rossa).",
+            "btn-pick-replace-from": "Colore Originale (Dal): Clicca sulla pipetta e scegli sul disegno il colore vecchio da eliminare.",
+            "btn-pick-replace-to": "Nuovo Colore (Al): Clicca sulla pipetta e scegli la nuova vernice con cui colorare le zone del colore originale.",
+            "replace-tolerance": "Tolleranza Colore: Aumentala se vuoi che anche le sfumature (le ombre) del colore originale vengano verniciate col nuovo colore.",
+            "btn-add-color-replace-rule": "Aggiungi Sostituzione: Premi qui per applicare il cambio colore su tutta la GIF!",
+            
+            // POSIZIONE 3D (XYZ E PROPRIETÀ)
+            "tab-prop-xyz": "Posizione & Profondità: Regola manualmente al millimetro la posizione delle tue immagini usando i numeri.",
+            "xyz-val-x": "Posizione X: Sposta l'oggetto orizzontalmente (Sinistra/Destra).",
+            "xyz-val-y": "Posizione Y: Sposta l'oggetto verticalmente (Su/Giù).",
+            "xyz-val-z": "Profondità Z: Vuoi che un'immagine stia sopra o sotto un'altra? Aumenta questo numero per portarla in primo piano rispetto alle altre!",
+            "xyz-val-w": "Larghezza (W): Allarga o stringi l'immagine in pixel.",
+            "xyz-val-h": "Altezza (H): Alza o schiaccia l'immagine in pixel.",
+            "xyz-keep-ratio": "Mantieni Proporzioni: Se ha la spunta, quando allarghi l'immagine, l'altezza si adatterà da sola per non storpiarla.",
+            "xyz-val-r": "Rotazione: Scrivi un numero (es. 45 o 90) per inclinare l'immagine come fosse storta.",
+            "xyz-val-opacity": "Opacità (%): Abbassa questo numero da 100 a 50 per rendere l'immagine semi-trasparente, come un fantasma.",
+            "xyz-text-content": "Testo: Se hai selezionato una scritta, puoi modificarne le parole qui dentro.",
+            "xyz-text-size": "Grandezza Testo: Scegli quanto devono essere grandi le parole.",
+            "xyz-text-font": "Carattere Testo: Scegli lo stile (font) della scritta.",
+            "xyz-text-color": "Colore Testo: Scegli di che colore tingere le parole.",
+            
+            // TIMELINE E FOTOGRAMMI
+            "timeline-controls": "Linea del Tempo (Timeline): Qui vedi lo scorrere della tua animazione. Ogni quadratino rappresenta un fotogramma, ovvero un istante di tempo.",
+            "play-btn": "Play / Pausa: Avvia l'animazione per vedere la GIF muoversi nella tavola da disegno centrale.",
+            "play-ms": "Velocità MS: Indica quanto tempo deve restare fermo un fotogramma prima di passare al successivo (100 = veloce, 500 = mezzo secondo, 1000 = lento).",
+            "play-all-frames-btn": "Mostra Tutti i Frame: Attiva l'anteprima fantasma di tutti i fotogrammi sovrapposti per aiutarti ad animare un movimento.",
+            "timeline-layer-select": "Scegli Livello: Clicca questa tendina se vuoi aprire la linea del tempo (keyframes) per animare le proprietà (posizione, rotazione) di un livello in particolare.",
+            "kf-sync-auto": "Auto Sincronizzazione: Se spuntato, il computer registrerà in automatico i movimenti che fai sulla tavola creando un'animazione per te.",
+            "kf-sync-x": "Registra Posizione X/Y: Registra gli spostamenti in alto/basso o destra/sinistra nel tempo.",
+            "kf-sync-r": "Registra Rotazione: Registra le inclinazioni per creare un effetto di girandola nel tempo.",
+            "kf-sync-op": "Registra Opacità: Registra le apparizioni e sparizioni (effetto fade) nel tempo.",
+            "btn-add-kf": "Aggiungi Animazione (+): Crea un nuovo punto di registrazione (Keyframe) manuale sull'istante esatto che stai guardando.",
+
+            // CANVAS - UNDO/REDO
+            "btn-undo": "Annulla (Ctrl+Z): Torna indietro e cancella l'ultima modifica che hai fatto. Se hai sbagliato qualcosa, clicca qui!",
+            "btn-redo": "Ripristina (Ctrl+Y): Rimette a posto la modifica che avevi annullato. È il contrario del pulsante Annulla.",
+
+            // ZOOM E GRIGLIA
+            "btn-zoom-reset": "Grandezza Reale (100%): Riporta la vista della tavola alla dimensione originale, né troppo grande né troppo piccola.",
+            "btn-zoom-in": "Ingrandisci (+): Avvicina la vista per lavorare sui dettagli con più precisione.",
+            "btn-toggle-grid": "Griglia Guida: Mostra o nasconde una griglia trasparente sulla tavola da disegno per aiutarti ad allineare gli elementi.",
+
+            // PROGETTO E FILE
+            "btn-apply-canvas-size": "Applica Grandezza: Conferma le dimensioni che hai scritto nei campi Larghezza e Altezza e ridimensiona la tavola da disegno.",
+            "btn-import-reference": "Importa Riferimento: Carica un'immagine o GIF come livello di riferimento 'bloccato'. Non si può modificare, è solo una guida visiva da usare come traccia.",
+            "btn-export-file": "Esporta File: Salva il tuo lavoro sul computer nel formato scelto (PNG, JPG o GIF animata). Questo è il risultato finale!",
+            "file-dropzone": "Zona Importazione: Trascina qui un file PNG, JPG o GIF dal tuo computer, oppure clicca per aprire il pannello di selezione file.",
+
+            // TRASPARENZA SFONDO AUTOMATICA
+            "btn-pick-transparent-color": "Pipetta Trasparenza: 1) Clicca questo tasto, il cursore cambierà. 2) Poi clicca direttamente sul colore dell'immagine che vuoi rendere trasparente.",
+            "btn-pick-bg-remove-color": "Pipetta Sfondo Auto: Clicca e poi clicca sul bordo esterno dell'immagine per indicare al programma qual è il colore di sfondo da rimuovere automaticamente.",
+            "bg-remove-active": "Attiva/Disattiva Sfondo Auto: Accende o spegne la rimozione automatica dello sfondo. Quando è verde, il bordo dell'immagine viene reso trasparente in tempo reale.",
+            "label-bg-remove-active": "Attiva Trasparenza Sfondo: Pulsante interruttore. Se è verde/acceso, il programma sta rimuovendo automaticamente il colore di sfondo dai bordi dell'immagine.",
+            "filter-border-radius": "Smussa Angoli: Scrivi un numero per arrotondare gli angoli dell'immagine selezionata. 0 = angoli perfettamente quadrati, 50+ = angoli molto morbidi.",
+            "btn-apply-corners": "Arrotonda: Applica il valore scelto per smussare gli angoli dell'immagine. L'effetto è visibile subito sulla tavola da disegno.",
+
+            // SOSTITUZIONE COLORE
+            "btn-add-replacement": "Aggiungi Sostituzione: Conferma e applica la sostituzione colore scelta. Da questo momento, tutti i pixel di quel colore saranno tinti con la nuova tinta scelta.",
+
+            // TIMELINE CONTROLLI AVANZATI
+            "btn-play-gif": "Play / Pausa: Avvia l'anteprima della tua animazione GIF. Clicca di nuovo per fermarla. Puoi vedere la GIF che si muove nella tavola da disegno!",
+            "btn-apply-delay-all": "Applica a Tutti: Imposta la stessa durata in millisecondi a tutti i fotogrammi. Utile per uniformare la velocità dell'intera animazione.",
+            "btn-duplicate-frame": "Duplica Frame: Crea una copia identica del fotogramma che stai guardando e la inserisce subito dopo. Utile per creare piccole variazioni a partire da un frame.",
+            "btn-delete-frame": "Elimina Frame: Cancella definitivamente il fotogramma che hai selezionato. Attenzione: non si può recuperare!",
+            "btn-reverse-frames": "Inverti Ordine: Capovolge l'ordine di tutti i fotogrammi, mettendo l'ultimo al posto del primo. Crea effetti di animazione a ritroso.",
+            "btn-optimize-gif": "Ottimizza GIF ⚡: Analizza la tua animazione e rimuove i fotogrammi statici identici per ridurre il peso del file finale. Consigliato prima di esportare!",
+            "timeline-delay": "Durata Frame (ms): Indica quanti millisecondi deve stare fermo ogni fotogramma prima di passare al successivo. 100ms = veloce, 500ms = mezzo secondo lento.",
+            "timeline-speed-scale": "Velocità Anteprima: Cambia la velocità dell'anteprima nel programma (non influisce sulla GIF finale). 1x = normale, 2x = doppio rapido.",
+
+            // KEYFRAME NAVIGATION
+            "btn-goto-prev-keyframe": "Keyframe Precedente ◀: Salta al punto di animazione registrato precedente. Utile per navigare rapidamente tra i vari momenti animati.",
+            "btn-add-keyframe": "Aggiungi Keyframe ◆: Registra manualmente la posizione attuale del livello in questo esatto fotogramma. Il programma userà questo punto come riferimento per l'animazione.",
+            "btn-delete-keyframe": "Elimina Keyframe ✕: Rimuove il punto di animazione registrato nel fotogramma corrente. L'animazione non avrà più questo punto di riferimento.",
+            "btn-goto-next-keyframe": "Keyframe Successivo ▶: Salta al punto di animazione registrato successivo. Utile per controllare il percorso dell'animazione.",
+            "keyframe-target": "Livello da Animare: Scegli quale livello vuoi controllare con i keyframe. 'Principale' è la GIF caricata, 'Attivo' è il livello selezionato nella lista.",
+            "kf-auto-keyframe": "Registrazione Automatica: Quando è spuntata, ogni volta che sposti, ruoti o cambi un livello, il programma registra automaticamente un keyframe per te.",
+            "kf-prop-x": "Registra Posizione Orizzontale (X): Se spuntata, l'animazione terrà conto degli spostamenti sinistra-destra del livello.",
+            "kf-prop-y": "Registra Posizione Verticale (Y): Se spuntata, l'animazione terrà conto degli spostamenti su-giù del livello.",
+            "kf-prop-r": "Registra Rotazione (R): Se spuntata, l'animazione terrà conto delle rotazioni del livello (effetto girandola).",
+            "kf-prop-opacity": "Registra Opacità (Op): Se spuntata, l'animazione terrà conto delle variazioni di trasparenza del livello (effetto dissolvenza).",
+            "kf-prop-z": "Registra Profondità (Z): Se spuntata, anima la profondità del livello nel tempo (va avanti o indietro rispetto agli altri).",
+            "kf-prop-w": "Registra Larghezza (W): Se spuntata, il livello può allargarsi e stringersi nel tempo come se venisse schiacciato.",
+            "kf-prop-h": "Registra Altezza (H): Se spuntata, il livello può alzarsi e abbassarsi nel tempo come se venisse allungato.",
+
+            // SEZIONI TIMELINE VISIBILI
+            "timeline-frames-box": "Sequenza Fotogrammi: La fila di quadratini qui sotto rappresenta i fotogrammi della tua animazione. Clicca su uno per andare a quel momento.",
+            "keyframes-track-box": "Traccia Keyframe: La fila qui sotto mostra i punti di animazione registrati. I rombi colorati indicano dove hai memorizzato una posizione o un effetto.",
+
+            // SEZIONI PROGETTO VISIBILI
+            "export-format": "Formato Esportazione: Scegli come salvare il tuo lavoro. PNG mantiene la trasparenza, JPG è una foto normale, GIF crea un'animazione."
+        };
+
+        if(!btnTutorial || !tooltip) return;
+
+        btnTutorial.addEventListener("click", (e) => {
+            isTutorialMode = !isTutorialMode;
+            if(isTutorialMode) {
+                document.body.classList.add("tutorial-mode");
+                btnTutorial.classList.add("active-glow");
+            } else {
+                document.body.classList.remove("tutorial-mode");
+                btnTutorial.classList.remove("active-glow");
+                tooltip.classList.remove("show-tooltip");
+            }
+        });
+
+        // Ascolta la pressione del tasto ESC per uscire
+        document.addEventListener("keydown", (e) => {
+            if(e.key === "Escape" && isTutorialMode) {
+                btnTutorial.click();
+            }
+        });
+
+        // Intercetta tutti i click in fase di cattura
+        document.addEventListener("click", (e) => {
+            if(!isTutorialMode) return;
+            
+            // Trova l'elemento cliccato
+            let target = e.target;
+            
+            // Se clicco proprio il tasto tutorial, lascialo funzionare per disattivare la modalità
+            if(target.closest("#btn-tutorial-mode")) {
+                return;
+            }
+
+            // Blocca il funzionamento normale dell'app
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+
+            // Cerca la spiegazione risalendo l'albero DOM
+            let explanation = null;
+            let currentElement = target;
+            let elementTitle = "";
+
+            while (currentElement && currentElement !== document.body) {
+                let id = currentElement.id;
+                let dataTab = currentElement.getAttribute("data-tab"); // per i tab
+                
+                // Controlla dizionario tramite ID o attributo tab
+                if (id && tutorialDict[id]) {
+                    explanation = tutorialDict[id];
+                    break;
+                }
+                if (dataTab && tutorialDict[dataTab]) {
+                    explanation = tutorialDict[dataTab];
+                    break;
+                }
+                // Controlla se siamo su un tab-content
+                if (currentElement.classList.contains("tab-content") && tutorialDict[id]) {
+                    explanation = tutorialDict[id];
+                    break;
+                }
+
+                currentElement = currentElement.parentElement;
+            }
+
+            if (!explanation) {
+                explanation = "Clicca su uno strumento o su una linguetta per scoprire a cosa serve!";
+            } else {
+                let splitParts = explanation.split(":");
+                if(splitParts.length > 1) {
+                    elementTitle = splitParts[0].trim();
+                    explanation = splitParts.slice(1).join(":").trim();
+                }
+            }
+
+            // Mostra il tooltip
+            tooltip.innerHTML = (elementTitle ? `<strong>${elementTitle}</strong>` : "") + explanation;
+            
+            // Posiziona il tooltip vicino al mouse
+            let x = e.clientX + 15;
+            let y = e.clientY + 15;
+
+            // Evita che il tooltip esca dallo schermo
+            let tooltipWidth = 300; // larghezza massima da CSS
+            let tooltipHeight = 100; // altezza approssimativa
+            if(x + tooltipWidth > window.innerWidth) x = window.innerWidth - tooltipWidth - 20;
+            if(y + tooltipHeight > window.innerHeight) y = e.clientY - tooltipHeight - 20;
+
+            tooltip.style.left = `${x}px`;
+            tooltip.style.top = `${y}px`;
+            tooltip.classList.add("show-tooltip");
+
+        }, true);
+    }
+
+    initTabOrderSystem();
+    initInteractiveTutorial();
     startApp();
 });

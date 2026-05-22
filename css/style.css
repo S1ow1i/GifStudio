@@ -192,9 +192,9 @@
     --btn-pad-x: 16px;
     --btn-pad-sm-y: 8px;
     --btn-pad-sm-x: 12px;
-    --top-bar-h: 76px;
+    --top-bar-h: 48px;
     --win-header-h: 42px;
-    --win-tabs-h: 38px;
+    --win-tabs-h: 50px;
     --win-btn-size: 26px;
     --icon-xs: 12px;
     --icon-sm: 14px;
@@ -268,10 +268,10 @@ body, html {
     min-height: var(--top-bar-h);
     background-color: var(--bg-header);
     border-bottom: 1px solid var(--border-window);
-    display: grid;
-    grid-template-columns: minmax(160px, auto) minmax(420px, 1fr) minmax(130px, auto);
-    align-items: stretch;
-    padding: 4px var(--space-lg) 6px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 0 var(--space-lg);
     gap: var(--space-md);
     box-shadow: 0 5px 25px rgba(0, 0, 0, 0.3);
     position: absolute;
@@ -316,26 +316,24 @@ body, html {
 
 .top-bar-hub {
     display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-    align-items: stretch;
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: center;
     min-width: 0;
-    gap: 2px;
+    gap: 15px;
+    flex: 1;
 }
 
 .top-bar-launcher-row {
     display: flex;
     justify-content: center;
     align-items: center;
-    padding-top: 2px;
-    min-height: 40px;
 }
 
 .top-bar-actions {
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     justify-content: flex-end;
-    padding-bottom: 6px;
     gap: var(--space-sm);
 }
 
@@ -346,11 +344,11 @@ body, html {
 }
 
 .status-info-spread {
-    width: 100%;
-    justify-content: space-between;
+    width: auto;
+    justify-content: flex-start;
     align-items: center;
     gap: var(--space-md);
-    padding: 0 var(--space-xs) 4px;
+    padding: 0;
 }
 
 .status-info-spread .status-item {
@@ -490,7 +488,8 @@ body, html {
 }
 
 .win-btn:hover {
-    background-color: rgba(255, 255, 255, 0.15);
+    background-color: rgba(var(--accent-color-rgb), 0.18);
+    color: var(--accent-color);
 }
 
 .win-pin.pinned-active {
@@ -927,8 +926,9 @@ select option {
 }
 
 .btn-secondary:hover {
-    background-color: rgba(255, 255, 255, 0.09);
-    border-color: var(--text-secondary);
+    background-color: rgba(var(--accent-color-rgb), 0.08);
+    border-color: rgba(var(--accent-color-rgb), 0.4);
+    color: var(--accent-color);
 }
 
 .btn-danger {
@@ -1113,9 +1113,14 @@ select option {
 }
 
 .tool-btn:hover {
-    background-color: rgba(255, 255, 255, 0.03);
-    color: var(--text-main);
-    border-color: var(--text-secondary);
+    background-color: rgba(var(--accent-color-rgb), 0.07);
+    color: var(--accent-color);
+    border-color: rgba(var(--accent-color-rgb), 0.4);
+}
+
+.tool-btn:hover svg {
+    color: var(--accent-color);
+    opacity: 1;
 }
 
 .tool-btn.active {
@@ -1160,8 +1165,9 @@ select option {
 }
 
 .theme-btn:hover {
-    background-color: rgba(255, 255, 255, 0.05);
-    border-color: var(--text-secondary);
+    background-color: rgba(var(--accent-color-rgb), 0.07);
+    border-color: rgba(var(--accent-color-rgb), 0.4);
+    color: var(--accent-color);
 }
 
 .theme-btn.active {
@@ -1751,14 +1757,14 @@ input[type="number"].ui-number-compact:focus {
     flex: 0 0 auto;
     min-width: max-content;
     min-height: var(--win-tabs-h);
-    padding: 0 var(--space-lg);
+    padding: 0 24px;
     background: transparent;
     border: none;
-    border-bottom: 2px solid transparent;
+    border-bottom: 3px solid transparent;
     color: var(--text-secondary);
     font-family: inherit;
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-title);
+    font-size: 14px;
+    font-weight: 700;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -1771,14 +1777,43 @@ input[type="number"].ui-number-compact:focus {
 }
 
 .tab-btn:hover {
-    color: var(--text-main);
-    background: rgba(255, 255, 255, 0.03);
+    color: var(--accent-color);
+    background: rgba(var(--accent-color-rgb), 0.05);
 }
 
 .tab-btn.active {
     color: var(--accent-color);
     border-bottom-color: var(--accent-color);
     background: rgba(var(--accent-color-rgb), 0.05);
+}
+
+.tab-order-selector {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(0,0,0,0.2);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+}
+.tab-order-selector span {
+    font-size: 10px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+}
+.tab-order-selector input {
+    width: 32px;
+    height: 20px;
+    background: transparent;
+    border: none;
+    color: var(--text-main);
+    font-size: 13px;
+    font-weight: bold;
+    text-align: center;
+    padding: 0;
+}
+.tab-order-selector input:focus {
+    outline: none;
 }
 
 .tab-content {
@@ -2866,6 +2901,68 @@ input[type="number"].ui-number-compact:focus {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: var(--space-xs);
+}
+/* ============================================================ */
+/* TUTORIAL INTERATTIVO */
+/* ============================================================ */
+
+/* Animazione pulsazione bianca per il tasto attivo */
+@keyframes tutorialPulse {
+    0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(255, 255, 255, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+}
+
+#btn-tutorial-mode {
+    transition: all 0.3s ease;
+}
+
+#btn-tutorial-mode.active-glow {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: 0 0 15px rgba(255,255,255,0.8);
+    animation: tutorialPulse 1.5s infinite;
+    border: none;
+}
+
+/* Quando la modalità è attiva, tutto ha il cursore "help" */
+body.tutorial-mode * {
+    cursor: help !important;
+}
+
+/* Tooltip flottante (Fumetto) */
+#tutorial-tooltip {
+    position: fixed;
+    z-index: 99999;
+    background: rgba(20, 22, 30, 0.95);
+    border: 1px solid var(--accent-color, #00ffcc);
+    color: #ffffff;
+    padding: 12px 18px;
+    border-radius: 8px;
+    max-width: 300px;
+    font-size: 14px;
+    line-height: 1.5;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.6);
+    pointer-events: none; /* Non deve catturare i clic */
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    visibility: hidden;
+}
+
+#tutorial-tooltip.show-tooltip {
+    opacity: 1;
+    transform: translateY(0);
+    visibility: visible;
+}
+
+#tutorial-tooltip strong {
+    color: var(--accent-color, #00ffcc);
+    display: block;
+    margin-bottom: 5px;
+    font-size: 15px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 @media (max-width: 1100px) {

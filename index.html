@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gif Studio - Modifica Foto e GIF Premium</title>
+    <title></title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -23,40 +23,49 @@
     <link rel="icon" type="image/png" href="icon.png">
 </head>
 <body>
+    <!-- Contenitore per il tooltip del Tutorial Interattivo -->
+    <div id="tutorial-tooltip"></div>
+    
     <!-- Sfondo Dinamico Desktop -->
     <div id="desktop">
         <!-- Barra Superiore di Controllo -->
         <header id="top-bar">
-            <div class="logo-area">
-                <img class="app-icon" src="icon.png" width="22" height="22" alt="Gif Studio Icon" style="border-radius: 4px; object-fit: cover; margin-right: 8px;">
-                <span class="app-title">Gif Studio</span>
-                <span class="app-tagline">Modifica Foto e GIF con precisione</span>
+            <!-- LOGO AREA -->
+            <div class="logo-area" style="display: flex; flex-direction: row; align-items: center; gap: 10px; margin-right: 18px; flex-shrink: 0;">
+                <img class="app-icon" src="icon.png" width="52" height="52" alt="Gif Studio Icon" style="border-radius: 10px; object-fit: cover; box-shadow: 0 0 16px rgba(var(--accent-color-rgb), 0.4), 0 2px 8px rgba(0,0,0,0.5);">
+                <span class="app-title" style="font-family: 'Orbitron', sans-serif; font-size: 1.25rem; letter-spacing: 2px; font-weight: 700; color: var(--accent-color); text-shadow: 0 0 12px rgba(var(--accent-color-rgb), 0.55); white-space: nowrap;">GIF STUDIO</span>
             </div>
             
-            <div class="top-bar-hub">
-                <div class="top-bar-launcher-row">
+            <div class="top-bar-hub" style="display: flex; flex: 1; align-items: center; justify-content: center; position: relative;">
+                <!-- Isola di comando CENTRATA -->
+                <div class="top-bar-launcher-row" style="position: absolute; left: 50%; transform: translateX(-50%);">
                     <div id="quick-launcher" class="glass-dock glass-dock-top" title="Mostra o nascondi le finestre dell'app"></div>
                 </div>
-                <div class="status-info status-info-spread">
-                    <span class="status-item status-item-canvas">
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg>
-                        Tavola: <strong id="status-canvas-size">800x600 px</strong>
+
+                <!-- Status info ultra-compatto (solo icona + valore) a destra -->
+                <div class="status-info" style="display: flex; flex-direction: row; gap: 6px; align-items: center; margin-left: auto;">
+                    <span class="status-item status-item-canvas" id="tut-status-canvas" style="display: flex; align-items: center; gap: 4px; padding: 3px 7px; background: rgba(255,255,255,0.05); border-radius: 6px; border: 1px solid rgba(255,255,255,0.07);" title="Dimensioni tavola da disegno">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--accent-color)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg>
+                        <strong id="status-canvas-size" style="font-size: 11px; font-weight: 600; opacity: 0.85;">800x600</strong>
                     </span>
-                    <span class="status-item status-item-layer">
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-                        Livello: <strong id="status-active-layer">Nessuno</strong>
+                    <span class="status-item status-item-layer" id="tut-status-layer" style="display: flex; align-items: center; gap: 4px; padding: 3px 7px; background: rgba(255,255,255,0.05); border-radius: 6px; border: 1px solid rgba(255,255,255,0.07); max-width: 90px;" title="Livello attivo">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--accent-color)" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                        <strong id="status-active-layer" style="font-size: 11px; font-weight: 600; opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">-</strong>
                     </span>
-                    <span class="status-item status-item-frames">
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M21 12H3M12 3v18"/></svg>
-                        Frame: <strong id="status-frames-count">1/1</strong>
+                    <span class="status-item status-item-frames" id="tut-status-frames" style="display: flex; align-items: center; gap: 4px; padding: 3px 7px; background: rgba(255,255,255,0.05); border-radius: 6px; border: 1px solid rgba(255,255,255,0.07);" title="Frame corrente / totale">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--accent-color)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M21 12H3M12 3v18"/></svg>
+                        <strong id="status-frames-count" style="font-size: 11px; font-weight: 600; opacity: 0.85;">1/1</strong>
                     </span>
                 </div>
             </div>
             
             <div class="top-bar-actions">
-                <button id="btn-default-layout" class="btn btn-secondary btn-sm" title="Applica la posizione di default delle finestre">
-                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5"/></svg>
-                    Posizione di Default
+                <button id="btn-default-layout" class="btn btn-secondary btn-sm" title="Applica la posizione di default delle finestre" style="display: flex; align-items: center; gap: 4px;">
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5"/></svg>
+                    Default
+                </button>
+                <button id="btn-tutorial-mode" class="btn btn-secondary btn-sm" title="Attiva la modalità Tutorial Interattivo" style="margin-left: 8px; font-weight: bold; font-size: 14px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 50%;">
+                    ?
                 </button>
             </div>
         </header>
@@ -137,7 +146,12 @@
                     <!-- Tab 1: Progetto & File (Ex win-io) -->
                     <div id="tab-project-file" class="tab-content active-content tab-fill">
                         <div class="control-group">
-                            <label>Grandezza Tavola da Disegno</label>
+                            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                                <label id="tut-title-canvas-size" style="margin-bottom: 0;">Grandezza Tavola da Disegno</label>
+                                <div class="tab-order-selector" title="Ordine di visualizzazione della scheda in alto">
+                                    <span>Pos:</span><input type="number" class="tab-order-input" data-target="tab-project-file" min="1" max="10" value="1">
+                                </div>
+                            </div>
                             <div class="input-row">
                                 <div class="input-field">
                                     <span title="Larghezza (Width)">Larg:</span>
@@ -191,7 +205,12 @@
                     <!-- Tab 2: Temi & Stile (Ex win-ui) -->
                     <div id="tab-project-style" class="tab-content tab-fill">
                         <div class="control-group">
-                            <label>Temi già pronti</label>
+                            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                                <label id="tut-title-themes" style="margin-bottom: 0;">Temi già pronti</label>
+                                <div class="tab-order-selector" title="Ordine di visualizzazione della scheda in alto">
+                                    <span>Pos:</span><input type="number" class="tab-order-input" data-target="tab-project-style" min="1" max="10" value="2">
+                                </div>
+                            </div>
                             <div class="preset-theme-grid">
                                 <button id="theme-dark" class="theme-btn active" data-theme="dark">Slate Grigio</button>
                                 <button id="theme-cyber" class="theme-btn" data-theme="cyber">Vetro Liquido</button>
@@ -203,7 +222,7 @@
                         </div>
                         
                         <div class="control-group">
-                            <label>Crea il tuo stile (Colori personalizzati)</label>
+                            <label id="tut-title-custom-colors">Crea il tuo stile (Colori personalizzati)</label>
                             <div class="color-picker-row">
                                 <div class="color-picker-box">
                                     <span>Sfondo</span>
@@ -225,7 +244,7 @@
                         </div>
 
                         <div class="control-group" style="border-bottom:none; padding-bottom:0;">
-                            <label>Scrittura e Angoli Finestre</label>
+                            <label id="tut-title-fonts">Scrittura e Angoli Finestre</label>
                             <div class="input-row">
                                 <div class="input-field">
                                     <span>Carattere:</span>
@@ -258,6 +277,9 @@
                                 <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                                 Elimina Livello
                             </button>
+                            <div class="tab-order-selector" title="Ordine di visualizzazione della scheda in alto" style="margin-left: 8px;">
+                                <span>Pos:</span><input type="number" class="tab-order-input" data-target="tab-project-layers" min="1" max="10" value="3">
+                            </div>
                         </div>
                         <div class="layer-list-wrapper flex-grow">
                             <ul id="layer-list" class="layer-list">
@@ -306,7 +328,12 @@
                     <!-- Tab 1: Disegno Manuale (Ex win-drawing) -->
                     <div id="tab-tools-draw" class="tab-content tab-fill">
                         <div class="control-group control-group-compact">
-                            <label>Scegli uno Strumento</label>
+                            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                                <label id="tut-title-tools" style="margin-bottom: 0;">Scegli uno Strumento</label>
+                                <div class="tab-order-selector" title="Ordine di visualizzazione della scheda in alto">
+                                    <span>Pos:</span><input type="number" class="tab-order-input" data-target="tab-tools-draw" min="1" max="10" value="1">
+                                </div>
+                            </div>
                             <div class="tool-btn-grid tool-btn-grid-row">
                                 <button id="draw-tool-select" class="tool-btn active" title="Muovi gli oggetti liberamente">
                                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3zM13 13l6 6"/></svg>
@@ -328,12 +355,29 @@
                                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
                                     <span>Aggiungi Scritta</span>
                                 </button>
+                                <button id="draw-tool-magic-wand" class="tool-btn" title="Crea una maschera di protezione intelligente">
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 21.5l14-14M15 3h1m-1 2h1M5 9h1m-1 2h1M20 18h1m-1 2h1M18 9l1-1M19 12l1-1M9 18l1-1M12 19l1-1M14 6l3 3"/></svg>
+                                    <span>Bacchetta Magica</span>
+                                </button>
                             </div>
+                        </div>
+
+                        <!-- Opzioni Maschera Bacchetta Magica -->
+                        <div class="control-group" id="magic-wand-settings-group" style="display: none;">
+                            <label id="tut-title-magic-wand">Impostazioni Bacchetta Magica</label>
+                            <div class="slider-row" style="margin-bottom: 12px;">
+                                <label class="small-label">Tolleranza Colore: <span id="magic-wand-tolerance-text">20%</span></label>
+                                <input type="range" id="magic-wand-tolerance" min="0" max="100" value="20">
+                            </div>
+                            <button id="btn-remove-protection-mask" class="danger-btn" style="width: 100%; padding: 8px; border-radius: 6px; cursor: pointer; border: 1px solid var(--danger-color); background: rgba(255,59,48,0.1); color: var(--danger-color); display: flex; justify-content: center; align-items: center; gap: 8px;">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                                Rimuovi Maschera
+                            </button>
                         </div>
 
                         <!-- Opzione gomma avanzata: Gomma Pennello vs Gomma Sfondo GIF -->
                         <div class="control-group" id="eraser-mode-group" style="display: none;">
-                            <label>Modalità della Gomma</label>
+                            <label id="tut-title-eraser">Modalità della Gomma</label>
                             <div class="eraser-mode-options">
                                 <button type="button" id="eraser-mode-brush" class="mode-btn active" title="Cancella solo i tratti creati con il pennello">
                                     🖌️ Gomma Pennello
@@ -345,7 +389,7 @@
                         </div>
                         
                         <div class="control-group" id="brush-settings-group" style="display: none; border-bottom:none; padding-bottom:0;">
-                            <label>Configura Pennello / Gomma</label>
+                            <label id="tut-title-brush">Configura Pennello / Gomma</label>
                             <div class="input-row">
                                 <div class="input-field flex-grow" style="margin-right: 10px;">
                                     <span>Spessore px:</span>
@@ -366,6 +410,12 @@
                     
                     <!-- Tab 4: Posizione XYZ (Spostato sotto Proprietà e Filtri) -->
                     <div id="tab-prop-xyz" class="tab-content tab-fill">
+                        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                            <label id="tut-title-xyz" style="margin-bottom: 0;">🎯 Posizione e Profondità (X, Y, Z)</label>
+                            <div class="tab-order-selector" title="Ordine di visualizzazione della scheda in alto">
+                                <span>Pos:</span><input type="number" class="tab-order-input" data-target="tab-prop-xyz" min="1" max="10" value="2">
+                            </div>
+                        </div>
                         
                         <div class="layer-warning" id="xyz-no-layer-warning">
                             Seleziona un livello nella lista livelli per poterlo muovere, ruotare o modificare.
@@ -473,7 +523,12 @@
                     <!-- Tab 1: Trasparenza Sfondo -->
                     <div id="tab-prop-bg" class="tab-content active-content tab-fill">
                         <div class="control-group ui-panel-box">
-                            <label>🎯 Trasparenza a catena (pipetta)</label>
+                            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                                <label id="tut-title-bg-transparent" style="margin-bottom: 0;">Sfondo Trasparente o Tinta Unita</label>
+                                <div class="tab-order-selector" title="Ordine di visualizzazione della scheda in alto">
+                                    <span>Pos:</span><input type="number" class="tab-order-input" data-target="tab-prop-bg" min="1" max="10" value="3">
+                                </div>
+                            </div>
                             <div class="ui-hint">
                                 1) Clicca la <b>pipetta</b> e un punto sulla tavola · 2) <b>Aggiungi Trasparenza</b> · 3) Ripeti per altre zone.
                             </div>
@@ -510,7 +565,7 @@
                         </div>
 
                         <div class="control-group">
-                            <label>✨ Trasparenza sfondo (automatica)</label>
+                            <label id="tut-title-bg-auto">✨ Trasparenza sfondo (automatica)</label>
                             <div class="ui-hint">
                                 Rimuove lo sfondo esterno collegato ai bordi dell'immagine (modalità classica).
                             </div>
@@ -556,7 +611,12 @@
                     <!-- Tab 3: Sostituzione Colori Globale su tutta la GIF -->
                     <div id="tab-prop-colors" class="tab-content tab-fill">
                         <div class="control-group">
-                            <label>🌈 Sostituisci Colore Globale</label>
+                            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                                <label id="tut-title-replace-color" style="margin-bottom: 0;">🌈 Sostituisci Colore Globale</label>
+                                <div class="tab-order-selector" title="Ordine di visualizzazione della scheda in alto">
+                                    <span>Pos:</span><input type="number" class="tab-order-input" data-target="tab-prop-colors" min="1" max="10" value="4">
+                                </div>
+                            </div>
                             <div class="ui-hint">
                                 Sostituisci un colore con una nuova tinta su <b>tutti i fotogrammi</b>. Usa la pipetta per limitare l'effetto ai soli pixel uniti.
                             </div>
