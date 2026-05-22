@@ -7,3 +7,8 @@ Thumbs.db
 
 .vscode/
 test-results.json
+
+Output/
+*.zip
+*.lnk
+Gif Studio/

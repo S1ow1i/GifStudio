@@ -1,0 +1,29 @@
+======================================================
+ COME INSTALLARE GIF STUDIO SENZA BLOCCHI DI SICUREZZA
+======================================================
+
+Gif Studio è stato firmato digitalmente con un certificato
+di sicurezza personalizzato per garantirne l'integrità.
+
+Poiché questo certificato è privato, al primo avvio Windows 
+SmartScreen potrebbe mostrare la schermata blu "Windows ha 
+protetto il tuo PC".
+
+Per eliminare questo blocco per sempre sul tuo PC, devi
+installare il certificato di sicurezza in questo modo:
+
+1. Fai doppio clic sul file "gifstudio-public.cer" che
+   trovi in questa cartella.
+2. Clicca sul pulsante "Installa certificato...".
+3. Scegli "Computer locale" (richiederà i permessi di 
+   amministratore) e vai Avanti.
+4. Seleziona "Colloca tutti i certificati nel seguente 
+   archivio" e clicca su "Sfoglia...".
+5. ATTENZIONE: Scegli la cartella "Autorità di certificazione
+   radice attendibili" (Trusted Root Certification Authorities).
+   È fondamentale scegliere questa specifica cartella.
+6. Dai OK, vai Avanti e clicca Fine.
+
+Fatto questo, Windows riconoscerà Gif Studio come un'app
+totalmente sicura e potrai avviare l'eseguibile senza 
+nessun blocco o avviso fastidioso!
