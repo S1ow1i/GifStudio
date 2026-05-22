@@ -11,18 +11,21 @@ PrivilegesRequired=admin
 ; Evita schermate non necessarie
 DisableProgramGroupPage=yes
 DisableReadyPage=yes
+; Icona del setup stesso
+SetupIconFile=icon.ico
 
 [Files]
-; Include il tuo launcher portable e il certificato pubblico
-Source: "gifstudio-portable.exe"; DestDir: "{app}"; Flags: ignoreversion
+; Include the native Electron folder and public certificate
+Source: "dist\Gif Studio-win32-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "gifstudio-public.cer"; DestDir: "{app}"; Flags: ignoreversion
+Source: "icon.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{autodesktop}\Gif Studio"; Filename: "{app}\gifstudio-portable.exe"
-Name: "{group}\Gif Studio"; Filename: "{app}\gifstudio-portable.exe"
+Name: "{autodesktop}\Gif Studio"; Filename: "{app}\Gif Studio.exe"; IconFilename: "{app}\icon.ico"
+Name: "{group}\Gif Studio"; Filename: "{app}\Gif Studio.exe"; IconFilename: "{app}\icon.ico"
 
 [Run]
-; Il colpo di genio: esegue certutil in background in modalità silenziosa durante l'installazione
+; Esegue certutil in background in modalità silenziosa durante l'installazione
 Filename: "certutil.exe"; Parameters: "-addstore -f ""Root"" ""{app}\gifstudio-public.cer"""; Flags: runhidden
 ; Avvia l'app alla fine dell'installazione
-Filename: "{app}\gifstudio-portable.exe"; Description: "Avvia Gif Studio adesso"; Flags: postinstall nowait skipifsilent
+Filename: "{app}\Gif Studio.exe"; Description: "Avvia Gif Studio adesso"; Flags: postinstall nowait skipifsilent
