@@ -4,3 +4,6 @@ gifstudio-portable.exe
 *.log
 .DS_Store
 Thumbs.db
+
+.vscode/
+test-results.json

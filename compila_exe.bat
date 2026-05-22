@@ -1,5 +1,7 @@
 @echo off
 title Compilazione Gif Studio Portable Desktop EXE
+set "PATH=%SystemRoot%\System32;%SystemRoot%;C:\Program Files\nodejs;%PATH%"
+set "POWERSHELL=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
 echo ======================================================================
 echo           GIF STUDIO PORTABLE - PIPELINE DI COMPILAZIONE
 echo ======================================================================
@@ -29,11 +31,11 @@ if %ERRORLEVEL% neq 0 (
 echo.
 
 echo 3b. Riduzione lingue Electron (solo inglese e italiano)...
-powershell -Command "$loc='dist\Gif Studio-win32-x64\locales'; if (Test-Path $loc) { Get-ChildItem $loc -Filter '*.pak' | Where-Object { $_.Name -notin 'en-US.pak','it.pak' } | Remove-Item -Force }"
+%POWERSHELL% -NoProfile -ExecutionPolicy Bypass -Command "$loc='dist\Gif Studio-win32-x64\locales'; if (Test-Path $loc) { Get-ChildItem $loc -Filter '*.pak' | Where-Object { $_.Name -notin 'en-US.pak','it.pak' } | Remove-Item -Force }"
 echo.
 
 echo 4. Compressione dell'applicazione in formato ZIP (app.zip)...
-powershell -Command "Compress-Archive -Path '.\dist\Gif Studio-win32-x64\*' -DestinationPath '.\dist\app.zip' -Force"
+%POWERSHELL% -NoProfile -ExecutionPolicy Bypass -Command "Compress-Archive -Path '.\dist\Gif Studio-win32-x64\*' -DestinationPath '.\dist\app.zip' -Force"
 if %ERRORLEVEL% neq 0 (
     echo [ERRORE] Errore durante la creazione dell'archivio zip.
     goto error
@@ -68,6 +70,7 @@ echo  COMPILAZIONE COMPLETATA
 echo  Eseguibile: dist\gifstudio-portable.exe e gifstudio-portable.exe
 echo ======================================================================
 echo.
+if /i "%~1"=="--no-pause" exit /b 0
 pause
 exit /b 0
 
@@ -75,5 +78,6 @@ exit /b 0
 echo.
 echo [ERRORE] La compilazione e' fallita. Controlla i log sopra.
 echo.
+if /i "%~1"=="--no-pause" exit /b 1
 pause
 exit /b 1

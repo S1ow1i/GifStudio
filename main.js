@@ -2,13 +2,14 @@
    GIF STUDIO - ELECTRON DESKTOP ENTRYPOINT
    ========================================================================== */
 
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, shell } = require('electron');
+const { spawn } = require('child_process');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
 const PORT = 8000;
-const CURRENT_VERSION = '1.0.1';
+const CURRENT_VERSION = '1.0.18';
 const GITHUB_REPO = 'S1ow1i/GifStudio';
 
 function getAppStatePath() {
@@ -51,6 +52,75 @@ const MIME_TYPES = {
 };
 
 let server;
+let mainWindowRef = null;
+
+/** Browser esterni leggeri (Firefox/Brave) prima del browser di sistema. */
+function getLightBrowserPaths() {
+    const pf = process.env.ProgramFiles || 'C:\\Program Files';
+    const pf86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+    const localApp = process.env.LOCALAPPDATA || '';
+    return [
+        path.join(pf, 'Mozilla Firefox', 'firefox.exe'),
+        path.join(pf86, 'Mozilla Firefox', 'firefox.exe'),
+        path.join(localApp, 'Mozilla', 'Firefox', 'firefox.exe'),
+        path.join(pf, 'BraveSoftware', 'Brave-Browser', 'Application', 'brave.exe'),
+        path.join(localApp, 'BraveSoftware', 'Brave-Browser', 'Application', 'brave.exe')
+    ];
+}
+
+function openUrlInLightBrowser(url) {
+    for (const browserPath of getLightBrowserPaths()) {
+        if (!fs.existsSync(browserPath)) continue;
+        try {
+            spawn(browserPath, [url], { detached: true, stdio: 'ignore' }).unref();
+            return { ok: true, browser: path.basename(browserPath, '.exe') };
+        } catch (err) {
+            console.warn('Apertura browser fallita:', browserPath, err.message);
+        }
+    }
+    shell.openExternal(url);
+    return { ok: true, browser: 'sistema' };
+}
+
+function downloadUpdateToDownloads(downloadUrl, version) {
+    const downloadsDir = path.join(app.getPath('home'), 'Downloads');
+    const safeVersion = String(version || 'latest').replace(/[^0-9.]/g, '') || 'latest';
+    const fileName = `gifstudio-portable-v${safeVersion}.exe`;
+    const targetPath = path.join(downloadsDir, fileName);
+    const tempPath = `${targetPath}.download`;
+
+    return fetch(downloadUrl, { headers: { 'User-Agent': 'GifStudio-AutoUpdater' } })
+        .then((res) => {
+            if (!res.ok) throw new Error(`Download fallito (${res.status})`);
+            return res.arrayBuffer();
+        })
+        .then((buf) => {
+            fs.mkdirSync(downloadsDir, { recursive: true });
+            fs.writeFileSync(tempPath, Buffer.from(buf));
+            if (fs.existsSync(targetPath)) {
+                try { fs.unlinkSync(targetPath); } catch (_) { /* sovrascrivi se possibile */ }
+            }
+            fs.renameSync(tempPath, targetPath);
+            return { ok: true, path: targetPath, fileName };
+        })
+        .catch((err) => {
+            try {
+                if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+            } catch (_) { /* ignore */ }
+            throw err;
+        });
+}
+
+function attachExternalLinkGuards(win) {
+    win.webContents.setWindowOpenHandler(({ url }) => {
+        openUrlInLightBrowser(url);
+        return { action: 'deny' };
+    });
+
+    win.webContents.session.on('will-download', (event) => {
+        event.preventDefault();
+    });
+}
 
 function startLocalServer() {
     server = http.createServer((req, res) => {
@@ -124,6 +194,7 @@ function startLocalServer() {
                         currentVersion: CURRENT_VERSION,
                         latestVersion: latestVersion,
                         downloadUrl: downloadUrl,
+                        releasePageUrl: data.html_url || '',
                         releaseNotes: data.body || ''
                     }));
                 } else {
@@ -133,6 +204,58 @@ function startLocalServer() {
             .catch(err => {
                 console.warn('Impossibile verificare gli aggiornamenti su GitHub:', err.message);
                 res.end(JSON.stringify({ updateAvailable: false, error: err.message }));
+            });
+            return;
+        }
+
+        if (reqPath === '/api/open-update-download') {
+            res.setHeader('Content-Type', 'application/json');
+            const qs = new URL(`http://127.0.0.1${req.url}`).searchParams;
+            const mode = qs.get('mode') || 'browser';
+            const pageUrl = qs.get('pageUrl') || '';
+            const downloadUrl = qs.get('downloadUrl') || '';
+            const version = qs.get('version') || 'latest';
+
+            if (mode === 'download' && downloadUrl) {
+                downloadUpdateToDownloads(downloadUrl, version)
+                    .then((result) => res.end(JSON.stringify(result)))
+                    .catch((err) => {
+                        res.statusCode = 500;
+                        res.end(JSON.stringify({ ok: false, error: err.message }));
+                    });
+                return;
+            }
+
+            const urlToOpen = pageUrl || downloadUrl;
+            if (!urlToOpen) {
+                res.statusCode = 400;
+                res.end(JSON.stringify({ ok: false, error: 'URL mancante' }));
+                return;
+            }
+            const result = openUrlInLightBrowser(urlToOpen);
+            res.end(JSON.stringify(result));
+            return;
+        }
+
+        if (reqPath === '/api/test-results' && req.method === 'POST') {
+            res.setHeader('Content-Type', 'application/json');
+            let body = '';
+            req.on('data', (chunk) => { body += chunk; });
+            req.on('end', () => {
+                try {
+                    fs.writeFileSync(path.join(__dirname, 'test-results.json'), body, 'utf8');
+                    res.end(JSON.stringify({ ok: true }));
+                    console.log('Automated test results saved to test-results.json');
+                    if (process.argv.includes('--run-tests')) {
+                        setTimeout(() => {
+                            if (mainWindowRef) mainWindowRef.close();
+                            app.quit();
+                        }, 500);
+                    }
+                } catch (err) {
+                    res.statusCode = 500;
+                    res.end(JSON.stringify({ ok: false, error: err.message }));
+                }
             });
             return;
         }
@@ -166,6 +289,7 @@ function startLocalServer() {
 }
 
 function createWindow() {
+    const isTestMode = process.argv.includes('--run-tests');
     const mainWindow = new BrowserWindow({
         width: 1300,
         height: 800,
@@ -174,20 +298,26 @@ function createWindow() {
         title: "Gif Studio",
         icon: path.join(__dirname, 'icon.png'),
         autoHideMenuBar: true,
-        show: false,
+        show: !isTestMode,
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true
         }
     });
 
+    mainWindowRef = mainWindow;
+    attachExternalLinkGuards(mainWindow);
+
     mainWindow.once('ready-to-show', () => {
-        mainWindow.maximize();
-        mainWindow.show();
+        if (!isTestMode) {
+            mainWindow.maximize();
+            mainWindow.show();
+        }
     });
 
     // Carica la pagina tramite il server HTTP locale (necessario per mantenere contesti sicuri per le API di File System)
-    mainWindow.loadURL(`http://localhost:${PORT}/index.html`);
+    const startUrl = isTestMode ? `http://localhost:${PORT}/index.html?test=true` : `http://localhost:${PORT}/index.html`;
+    mainWindow.loadURL(startUrl);
 
     mainWindow.on('closed', () => {
         if (server) {

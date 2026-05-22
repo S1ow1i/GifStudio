@@ -33,25 +33,30 @@
                 <span class="app-tagline">Modifica Foto e GIF con precisione</span>
             </div>
             
-            <div class="status-info">
-                <span class="status-item">
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="display:inline; vertical-align:middle; margin-right:4px;"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg>
-                    Tavola: <strong id="status-canvas-size">800x600 px</strong>
-                </span>
-                <span class="status-item">
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="display:inline; vertical-align:middle; margin-right:4px;"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-                    Livello Attivo: <strong id="status-active-layer">Nessuno</strong>
-                </span>
-                <span class="status-item">
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="display:inline; vertical-align:middle; margin-right:4px;"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M21 12H3M12 3v18"/></svg>
-                    Immagini GIF: <strong id="status-frames-count">1/1</strong>
-                </span>
+            <div class="top-bar-hub">
+                <div class="top-bar-launcher-row">
+                    <div id="quick-launcher" class="glass-dock glass-dock-top" title="Mostra o nascondi le finestre dell'app"></div>
+                </div>
+                <div class="status-info status-info-spread">
+                    <span class="status-item status-item-canvas">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg>
+                        Tavola: <strong id="status-canvas-size">800x600 px</strong>
+                    </span>
+                    <span class="status-item status-item-layer">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                        Livello: <strong id="status-active-layer">Nessuno</strong>
+                    </span>
+                    <span class="status-item status-item-frames">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M21 12H3M12 3v18"/></svg>
+                        Frame: <strong id="status-frames-count">1/1</strong>
+                    </span>
+                </div>
             </div>
             
             <div class="top-bar-actions">
-                <button id="btn-reset-layout" class="btn btn-secondary btn-sm" title="Ripristina la posizione delle finestre">
+                <button id="btn-default-layout" class="btn btn-secondary btn-sm" title="Applica la posizione di default delle finestre">
                     <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5"/></svg>
-                    Ripristina Posizioni
+                    Posizione di Default
                 </button>
             </div>
         </header>
@@ -62,7 +67,7 @@
             <!-- 1. FINESTRA: TAVOLA DA DISEGNO (CANVAS) -->
             <div id="win-canvas" class="window" style="width: 600px; height: 420px;">
                 <div class="window-header">
-                    <span class="window-title">Tavola da Disegno</span>
+                    <span class="window-title">▦ TAVOLA DA DISEGNO</span>
                     <div class="window-controls">
                         <span class="zoom-indicator" id="zoom-text">100%</span>
                         <button class="win-btn" id="btn-undo" title="Annulla (Ctrl+Z)" style="opacity: 0.3;" disabled>
@@ -90,7 +95,7 @@
                             <span class="separator"></span>
                             <button id="btn-toggle-grid" class="tool-btn-small" title="Mostra/Nascondi Griglia Tecnica">
                                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18H3zM9 3v18M15 3v18M3 9h18M3 15h18"/></svg>
-                                <span style="margin-left:4px; font-size:11px;">Griglia Guida</span>
+                                <span>Griglia Guida</span>
                             </button>
                         </div>
                         
@@ -111,9 +116,9 @@
             </div>
 
             <!-- 2. FINESTRA ACCORPATA: GESTIONE PROGETTO & STILE -->
-            <div id="win-project" class="window" style="width: 300px; height: 530px;">
+            <div id="win-project" class="window window-sidebar" style="width: 320px; height: 100%;">
                 <div class="window-header">
-                    <span class="window-title">📁 Progetto & Stile</span>
+                    <span class="window-title">📁 PROGETTO & STILE</span>
                     <div class="window-controls">
                         <button class="win-btn win-pin" title="Sopra Tutto (Mantieni in primo piano)">
                             <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M5 9l7-7 7 7"/></svg>
@@ -123,13 +128,14 @@
                 </div>
                 <!-- Schede (Tabs) -->
                 <div class="window-tabs-header">
+                    <button class="tab-btn" data-tab="tab-project-layers">🗂️ Lista Livelli</button>
                     <button class="tab-btn active" data-tab="tab-project-file">📁 Progetto & File</button>
                     <button class="tab-btn" data-tab="tab-project-style">🎨 Temi & Stile</button>
                 </div>
-                <div class="window-content">
+                <div class="window-content flex-column window-fill">
                     
                     <!-- Tab 1: Progetto & File (Ex win-io) -->
-                    <div id="tab-project-file" class="tab-content active-content">
+                    <div id="tab-project-file" class="tab-content active-content tab-fill">
                         <div class="control-group">
                             <label>Grandezza Tavola da Disegno</label>
                             <div class="input-row">
@@ -183,7 +189,7 @@
                     </div>
 
                     <!-- Tab 2: Temi & Stile (Ex win-ui) -->
-                    <div id="tab-project-style" class="tab-content">
+                    <div id="tab-project-style" class="tab-content tab-fill">
                         <div class="control-group">
                             <label>Temi già pronti</label>
                             <div class="preset-theme-grid">
@@ -235,13 +241,32 @@
                                 </div>
                                 <div class="input-field" style="width: 90px; flex: 0 0 90px;">
                                     <span>Testo px:</span>
-                                    <input type="number" id="ui-font-size" value="13" min="10" max="20">
+                                    <input type="number" id="ui-font-size" value="15" min="12" max="22">
                                 </div>
                             </div>
                             <div class="slider-row" style="margin-top: 12px;">
                                 <label class="small-label">Angoli Finestre: <span id="ui-radius-val">10px</span></label>
                                 <input type="range" id="ui-window-radius" min="0" max="30" value="10" style="width: 100%;">
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab 3: Lista Livelli -->
+                    <div id="tab-project-layers" class="tab-content flex-column tab-fill">
+                        <div class="layer-actions">
+                            <button id="btn-add-text-layer" class="btn btn-secondary btn-sm flex-grow" title="Aggiungi una scritta personalizzata">
+                                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
+                                + Aggiungi Scritta
+                            </button>
+                            <button id="btn-delete-layer" class="btn btn-danger btn-sm" title="Elimina il livello selezionato">
+                                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                Elimina
+                            </button>
+                        </div>
+                        <div class="layer-list-wrapper flex-grow">
+                            <ul id="layer-list" class="layer-list">
+                                <!-- Popolato dinamicamente -->
+                            </ul>
                         </div>
                     </div>
 
@@ -252,10 +277,10 @@
                 <div class="win-resize-handle-tl"></div>
             </div>
 
-            <!-- 3. FINESTRA ACCORPATA: STRUMENTI & LIVELLI -->
-            <div id="win-tools" class="window" style="width: 300px; height: 530px;">
+            <!-- 3. FINESTRA ACCORPATA: PROPRIETÀ & FILTRI -->
+            <div id="win-properties" class="window window-sidebar" style="width: 340px; height: 100%;">
                 <div class="window-header">
-                    <span class="window-title">🖌️ Strumenti & Livelli</span>
+                    <span class="window-title">⚙️ PROPRIETÀ & FILTRI</span>
                     <div class="window-controls">
                         <button class="win-btn win-pin" title="Sopra Tutto (Mantieni in primo piano)">
                             <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M5 9l7-7 7 7"/></svg>
@@ -263,18 +288,30 @@
                         <button class="win-btn win-minimize">&#8722;</button>
                     </div>
                 </div>
+
                 <!-- Schede (Tabs) -->
                 <div class="window-tabs-header">
-                    <button class="tab-btn active" data-tab="tab-tools-draw">🖌️ Disegno Manuale</button>
-                    <button class="tab-btn" data-tab="tab-tools-layers">🗂️ Lista Livelli</button>
+                    <button class="tab-btn active" data-tab="tab-prop-bg">✨ Trasparenza Sfondo</button>
+                    <button class="tab-btn" data-tab="tab-tools-draw">🖌️ Disegno Manuale</button>
+                    <button class="tab-btn" data-tab="tab-prop-colors">🌈 Colori GIF</button>
+                    <button class="tab-btn" data-tab="tab-prop-xyz">📐 Posizione XYZ</button>
                 </div>
-                <div class="window-content flex-column">
-                    
+                <div class="window-content flex-column window-fill">
+                    <!-- Selettore Ambito Modifica (Globale vs Singolo Frame) -->
+                    <div class="edit-scope-selector">
+                        <button type="button" id="btn-scope-frame" class="scope-btn active" title="Applica le modifiche solo al fotogramma corrente">
+                            🎞️ Solo Frame
+                        </button>
+                        <button type="button" id="btn-scope-global" class="scope-btn" title="Applica le modifiche a tutti i fotogrammi della GIF">
+                            🌍 Tutta la GIF
+                        </button>
+                    </div>
+
                     <!-- Tab 1: Disegno Manuale (Ex win-drawing) -->
-                    <div id="tab-tools-draw" class="tab-content active-content">
-                        <div class="control-group">
+                    <div id="tab-tools-draw" class="tab-content tab-fill">
+                        <div class="control-group control-group-compact">
                             <label>Scegli uno Strumento</label>
-                            <div class="tool-btn-grid">
+                            <div class="tool-btn-grid tool-btn-grid-row">
                                 <button id="draw-tool-select" class="tool-btn active" title="Muovi gli oggetti liberamente">
                                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3zM13 13l6 6"/></svg>
                                     <span>Sposta Oggetto</span>
@@ -316,7 +353,7 @@
                                 </div>
                                 <div class="input-field" id="brush-color-wrapper">
                                     <span>Colore:</span>
-                                    <input type="color" id="brush-color" value="#00ffcc" style="width: 45px; height: 26px; border: none; cursor: pointer; border-radius: 3px;">
+                                    <input type="color" id="brush-color" class="ui-color-swatch-lg" value="#00ffcc">
                                 </div>
                             </div>
                             <div class="slider-row" style="margin-top: 12px;">
@@ -326,73 +363,19 @@
                         </div>
                     </div>
 
-                    <!-- Tab 2: Lista Livelli (Ex win-layers) -->
-                    <div id="tab-tools-layers" class="tab-content flex-column">
-                        <div class="layer-actions">
-                            <button id="btn-add-text-layer" class="btn btn-secondary btn-sm flex-grow" title="Aggiungi una scritta personalizzata">
-                                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
-                                + Aggiungi Scritta
-                            </button>
-                            <button id="btn-delete-layer" class="btn btn-danger btn-sm" title="Elimina il livello selezionato">
-                                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                                Elimina
-                            </button>
-                        </div>
-                        <div class="layer-list-wrapper flex-grow">
-                            <ul id="layer-list" class="layer-list">
-                                <!-- Popolato dinamicamente -->
-                            </ul>
-                        </div>
-                    </div>
-
-                </div>
-                <div class="win-resize-handle-br"></div>
-                <div class="win-resize-handle-bl"></div>
-                <div class="win-resize-handle-tr"></div>
-                <div class="win-resize-handle-tl"></div>
-            </div>
-
-            <!-- 4. FINESTRA ACCORPATA: PROPRIETÀ & FILTRI -->
-            <div id="win-properties" class="window" style="width: 320px; height: 530px;">
-                <div class="window-header">
-                    <span class="window-title">📐 Proprietà & Filtri</span>
-                    <div class="window-controls">
-                        <button class="win-btn win-pin" title="Sopra Tutto (Mantieni in primo piano)">
-                            <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M5 9l7-7 7 7"/></svg>
-                        </button>
-                        <button class="win-btn win-minimize">&#8722;</button>
-                    </div>
-                </div>
-                
-                <!-- Selettore Ambito Modifica (Globale vs Singolo Frame) -->
-                <div class="edit-scope-selector">
-                    <button type="button" id="btn-scope-frame" class="scope-btn active" title="Applica le modifiche solo al fotogramma corrente">
-                        🎞️ Solo Frame
-                    </button>
-                    <button type="button" id="btn-scope-global" class="scope-btn" title="Applica le modifiche a tutti i fotogrammi della GIF">
-                        🌍 Tutta la GIF
-                    </button>
-                </div>
-
-                <!-- Schede (Tabs) -->
-                <div class="window-tabs-header">
-                    <button class="tab-btn active" data-tab="tab-prop-xyz">📐 Posizione XYZ</button>
-                    <button class="tab-btn" data-tab="tab-prop-bg">✨ Trasparenza Sfondo</button>
-                    <button class="tab-btn" data-tab="tab-prop-colors">🌈 Colori GIF</button>
-                </div>
-                <div class="window-content">
                     
-                    <!-- Tab 1: Posizione XYZ & Scritta (Ex win-xyz) -->
-                    <div id="tab-prop-xyz" class="tab-content active-content">
+                    <!-- Tab 4: Posizione XYZ (Spostato sotto Proprietà e Filtri) -->
+                    <div id="tab-prop-xyz" class="tab-content tab-fill">
+                        
                         <div class="layer-warning" id="xyz-no-layer-warning">
                             Seleziona un livello nella lista livelli per poterlo muovere, ruotare o modificare.
                         </div>
                         
-                        <div id="xyz-controls" class="disabled-content">
+                        <div id="xyz-controls" class="disabled-content props-stack">
                             <!-- Posizionamento XYZ -->
-                            <div class="control-group">
+                            <div class="control-group control-group-compact">
                                 <label>Posizione e Profondità (X, Y, Z)</label>
-                                <div class="input-row-3">
+                                <div class="input-row-3 props-grid-3">
                                     <div class="input-field" title="Spostamento Orizzontale X">
                                         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><path d="M19 12H5M17 9l3 3-3 3M7 9l-3 3 3 3"/></svg>
                                         <span>X:</span>
@@ -412,15 +395,15 @@
                             </div>
 
                             <!-- Grandezza e Smussatura -->
-                            <div class="control-group">
+                            <div class="control-group control-group-compact">
                                 <label>Grandezza Oggetto</label>
-                                <div class="input-row">
+                                <div class="input-row props-grid-2">
                                      <div class="input-field" title="Larghezza in pixel">
-                                         <span style="font-size:10px;">Larg (W):</span>
+                                         <span>Larg (W):</span>
                                          <input type="number" id="xyz-val-w" value="100" min="1">
                                      </div>
                                      <div class="input-field" title="Altezza in pixel">
-                                         <span style="font-size:10px;">Alt (H):</span>
+                                         <span>Alt (H):</span>
                                          <input type="number" id="xyz-val-h" value="100" min="1">
                                      </div>
                                  </div>
@@ -431,9 +414,9 @@
                              </div>
 
                             <!-- Rotazione e Trasparenza -->
-                            <div class="control-group">
+                            <div class="control-group control-group-compact">
                                 <label>Rotazione e Trasparenza</label>
-                                <div class="input-row">
+                                <div class="input-row props-grid-2">
                                      <div class="input-field" title="Ruota l'oggetto in gradi">
                                          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
                                          <span>Rot (°):</span>
@@ -466,7 +449,7 @@
                                         <option value="Pacifico">Pacifico (Scrittura mano)</option>
                                         <option value="Impact">Impact (Meme stile)</option>
                                     </select>
-                                    <input type="color" id="xyz-text-color" value="#ffffff" title="Scegli colore della scritta" style="width: 32px; height: 32px; border: none; cursor: pointer; border-radius: 4px;">
+                                    <input type="color" id="xyz-text-color" class="ui-color-swatch-lg" value="#ffffff" title="Scegli colore della scritta">
                                 </div>
                             </div>
 
@@ -487,37 +470,72 @@
                         </div>
                     </div>
 
-                    <!-- Tab 2: Trasparenza Sfondo -->
-                    <div id="tab-prop-bg" class="tab-content">
-                        <div class="control-group">
-                            <label>✨ Trasparenza Sfondo</label>
-                            <div style="font-size:11px; color:var(--text-secondary); margin-bottom:12px; line-height:1.4;">
-                                Seleziona un colore di sfondo (usando la pipetta o la tavolozza) e rendilo completamente trasparente sull'immagine o su tutti i frame della GIF.
+                    <!-- Tab 1: Trasparenza Sfondo -->
+                    <div id="tab-prop-bg" class="tab-content active-content tab-fill">
+                        <div class="control-group ui-panel-box">
+                            <label>🎯 Trasparenza a catena (pipetta)</label>
+                            <div class="ui-hint">
+                                1) Clicca la <b>pipetta</b> e un punto sulla tavola · 2) <b>Aggiungi Trasparenza</b> · 3) Ripeti per altre zone.
                             </div>
-                            
+                            <div id="transparent-pick-status" class="layer-warning ui-status-compact" style="margin-bottom:8px; display:none;"></div>
+                            <div class="input-row-3 compact-control-row">
+                                <div class="input-field" style="flex: 1.2;">
+                                    <span class="ui-field-label">Colore:</span>
+                                    <input type="color" id="bg-transparent-color" class="ui-color-swatch" value="#ffffff">
+                                    <button type="button" class="pipette-btn" id="btn-pick-transparent-color" title="Pipetta: scegli punto e colore da rendere trasparente" style="background: none; border: none; color: var(--accent-color);">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 22l6-6M9 11l6-6M12 3a3 3 0 0 1 3 3v2l4 4h2l3-3-3-3V4a3 3 0 0 0-3-3h-2l-3 3-1 1H9z"/></svg>
+                                    </button>
+                                </div>
+                                <div class="input-field" style="flex: 1.5;">
+                                    <span class="ui-inline-label">Tipo:</span>
+                                    <select id="bg-transparency-type" class="select-field-sm">
+                                        <option value="flood">Area Unita</option>
+                                        <option value="global">Intero Livello</option>
+                                    </select>
+                                </div>
+                                <div class="input-field" style="flex: 1;">
+                                    <span class="ui-inline-label">Toll.:</span>
+                                    <input type="number" id="bg-transparent-tolerance" class="ui-compact-num" value="20" min="0" max="255">
+                                </div>
+                            </div>
+                            <div class="slider-row" style="margin-bottom: 10px; display: flex; align-items: center;">
+                                <input type="range" id="bg-transparent-tolerance-slider" min="0" max="255" value="20" style="width: 100%; cursor: pointer;">
+                            </div>
+                            <button type="button" id="btn-add-transparency-rule" class="btn btn-accent btn-block" style="margin-bottom:8px;">
+                                Aggiungi Trasparenza
+                            </button>
+                            <div class="replacements-container" id="transparency-rules-list-box" style="max-height: 120px;">
+                                <div class="layer-warning">Nessuna regola ancora.</div>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <label>✨ Trasparenza sfondo (automatica)</label>
+                            <div class="ui-hint">
+                                Rimuove lo sfondo esterno collegato ai bordi dell'immagine (modalità classica).
+                            </div>
+                            <div class="input-row-3 compact-control-row">
+                                <div class="input-field" style="flex: 1.2;">
+                                    <span class="ui-field-label">Colore sfondo:</span>
+                                    <input type="color" id="bg-remove-color" class="ui-color-swatch" value="#ffffff">
+                                    <button type="button" class="pipette-btn" id="btn-pick-bg-remove-color" title="Pipetta: seme per trasparenza automatica ai bordi" style="background: none; border: none; color: var(--text-secondary);">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 22l6-6M9 11l6-6M12 3a3 3 0 0 1 3 3v2l4 4h2l3-3-3-3V4a3 3 0 0 0-3-3h-2l-3 3-1 1H9z"/></svg>
+                                    </button>
+                                </div>
+                                <div class="input-field" style="flex: 1;">
+                                    <span class="ui-inline-label">Toll.:</span>
+                                    <input type="number" id="bg-remove-tolerance" class="ui-compact-num" value="20" min="0" max="255">
+                                </div>
+                            </div>
+                            <div class="slider-row" style="margin-bottom: 10px; display: flex; align-items: center;">
+                                <input type="range" id="bg-remove-tolerance-slider" min="0" max="255" value="20" style="width: 100%; cursor: pointer;">
+                            </div>
                             <div class="bg-remove-active-wrapper" style="margin-bottom: 15px; position: relative;">
                                 <input type="checkbox" id="bg-remove-active" style="display: none;">
-                                <label for="bg-remove-active" id="label-bg-remove-active" class="btn btn-block" style="display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; font-size: 13px; padding: 12px; border: none; cursor: pointer; border-radius: 8px; transition: all 0.3s ease; background: rgba(255,255,255,0.05); color: var(--text-secondary); border: 1px solid rgba(255,255,255,0.1); user-select: none;">
+                                <label for="bg-remove-active" id="label-bg-remove-active" class="btn btn-block" style="display: flex; align-items: center; justify-content: center; gap: 8px; border: none; cursor: pointer; border-radius: 8px; transition: all 0.3s ease; background: rgba(255,255,255,0.05); color: var(--text-secondary); border: 1px solid rgba(255,255,255,0.1); user-select: none;">
                                     <span class="status-icon">⚪</span> 
                                     <span class="status-text">Attiva Trasparenza Sfondo</span>
                                 </label>
-                            </div>
-
-                            <div class="input-row-3" style="align-items: center; margin-bottom:8px; gap: 8px; display: flex;">
-                                <div class="input-field" style="flex: 1; gap: 4px; display: flex; align-items: center;" title="Colore dello sfondo da rimuovere">
-                                    <span style="font-size: 9px; text-transform:uppercase;">Colore:</span>
-                                    <input type="color" id="bg-remove-color" value="#ffffff" style="width: 25px; height: 18px; border: none; cursor: pointer; padding: 0; background: none;">
-                                    <button type="button" class="pipette-btn" id="btn-pick-bg-color" title="Pipetta seleziona colore da rimuovere" style="background: none; border: none; cursor: pointer; display: flex; align-items: center; padding: 2px; color: var(--text-secondary);">
-                                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 22l6-6M9 11l6-6M12 3a3 3 0 0 1 3 3v2l4 4h2l3-3-3-3V4a3 3 0 0 0-3-3h-2l-3 3-1 1H9z"/></svg>
-                                    </button>
-                                </div>
-                                <div class="input-field" style="flex: 1; display: flex; align-items: center;">
-                                    <span style="font-size:10px; margin-right:4px;">Tolleranza:</span>
-                                    <input type="number" id="bg-remove-tolerance" value="20" min="0" max="255" style="width: 50px;">
-                                </div>
-                            </div>
-                            <div class="slider-row" style="margin-bottom: 12px; display: flex; align-items: center;">
-                                <input type="range" id="bg-remove-tolerance-slider" min="0" max="255" value="20" style="width: 100%; cursor: pointer;">
                             </div>
                         </div>
 
@@ -530,39 +548,39 @@
                                     <span>Smussa Angoli px:</span>
                                     <input type="number" id="filter-border-radius" value="0" min="0" max="500">
                                 </div>
-                                <button id="btn-apply-corners" class="btn btn-secondary btn-sm" style="height: 32px; align-self: flex-end;">Arrotonda</button>
+                                <button id="btn-apply-corners" class="btn btn-secondary btn-sm" style="align-self: flex-end;">Arrotonda</button>
                             </div>
                         </div>
                     </div>
 
                     <!-- Tab 3: Sostituzione Colori Globale su tutta la GIF -->
-                    <div id="tab-prop-colors" class="tab-content">
+                    <div id="tab-prop-colors" class="tab-content tab-fill">
                         <div class="control-group">
                             <label>🌈 Sostituisci Colore Globale</label>
-                            <div style="font-size:11px; color:var(--text-secondary); margin-bottom:10px; line-height:1.35;">
-                                Sostituisci un colore con una nuova tinta su **tutti i fotogrammi**. Usa la pipetta per limitare l'effetto ai soli pixel uniti.
+                            <div class="ui-hint">
+                                Sostituisci un colore con una nuova tinta su <b>tutti i fotogrammi</b>. Usa la pipetta per limitare l'effetto ai soli pixel uniti.
                             </div>
                             
-                            <div class="input-row-3" style="align-items: center; margin-bottom:8px; gap: 4px;">
-                                <div class="input-field" style="flex: 1; gap: 4px;" title="Colore originale da sostituire">
-                                    <span style="font-size: 9px; text-transform:uppercase;">Dal:</span>
-                                    <input type="color" id="replace-color-from" value="#ffffff" style="width: 20px; height: 18px; border: none; cursor: pointer; padding: 0; background: none;">
-                                    <button type="button" class="pipette-btn" id="btn-pick-replace-from" title="Pipetta colore di origine" style="background: none; border: none; cursor: pointer; display: flex; align-items: center; padding: 2px; color: var(--text-secondary);">
-                                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 22l6-6M9 11l6-6M12 3a3 3 0 0 1 3 3v2l4 4h2l3-3-3-3V4a3 3 0 0 0-3-3h-2l-3 3-1 1H9z"/></svg>
+                            <div class="input-row-3 compact-control-row">
+                                <div class="input-field" style="flex: 1;" title="Colore originale da sostituire">
+                                    <span class="ui-field-label">Dal:</span>
+                                    <input type="color" id="replace-color-from" class="ui-color-swatch" value="#ffffff">
+                                    <button type="button" class="pipette-btn" id="btn-pick-replace-from" title="Pipetta colore di origine" style="background: none; border: none; color: var(--text-secondary);">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 22l6-6M9 11l6-6M12 3a3 3 0 0 1 3 3v2l4 4h2l3-3-3-3V4a3 3 0 0 0-3-3h-2l-3 3-1 1H9z"/></svg>
                                     </button>
                                 </div>
-                                <div class="input-field" style="flex: 1; gap: 4px;" title="Nuovo colore da applicare">
-                                    <span style="font-size: 9px; text-transform:uppercase;">Al:</span>
-                                    <input type="color" id="replace-color-to" value="#00ffcc" style="width: 20px; height: 18px; border: none; cursor: pointer; padding: 0; background: none; margin-right: 4px;">
-                                    <button type="button" class="pipette-btn" id="btn-pick-replace-to" title="Pipetta colore di destinazione" style="background: none; border: none; cursor: pointer; display: flex; align-items: center; padding: 2px; color: var(--text-secondary);">
-                                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 22l6-6M9 11l6-6M12 3a3 3 0 0 1 3 3v2l4 4h2l3-3-3-3V4a3 3 0 0 0-3-3h-2l-3 3-1 1H9z"/></svg>
+                                <div class="input-field" style="flex: 1;" title="Nuovo colore da applicare">
+                                    <span class="ui-field-label">Al:</span>
+                                    <input type="color" id="replace-color-to" class="ui-color-swatch" value="#00ffcc">
+                                    <button type="button" class="pipette-btn" id="btn-pick-replace-to" title="Pipetta colore di destinazione" style="background: none; border: none; color: var(--text-secondary);">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 22l6-6M9 11l6-6M12 3a3 3 0 0 1 3 3v2l4 4h2l3-3-3-3V4a3 3 0 0 0-3-3h-2l-3 3-1 1H9z"/></svg>
                                     </button>
                                 </div>
                             </div>
                             
-                            <div class="input-row-3" style="align-items: center; margin-bottom: 8px;">
+                            <div class="input-row-3 compact-control-row">
                                 <div class="input-field" style="flex: 1;">
-                                    <span style="font-size:10px;">Tolleranza:</span>
+                                    <span>Tolleranza:</span>
                                     <input type="number" id="replace-color-tolerance" value="20" min="0" max="255">
                                 </div>
                             </div>
@@ -576,7 +594,7 @@
                         <div class="control-group" style="border-bottom:none; padding-bottom:0;">
                             <label>📋 Sostituzioni Attive</label>
                             <div class="replacements-container" id="replacements-list-box">
-                                <div class="layer-warning" style="padding:15px 5px; font-size:11px;">
+                                <div class="layer-warning">
                                     Nessuna sostituzione attiva su questa GIF.
                                 </div>
                             </div>
@@ -591,9 +609,9 @@
             </div>
 
             <!-- 5. FINESTRA: TIMELINE GIF (PIATTAFORMA INFERIORE) -->
-            <div id="win-timeline" class="window" style="width: 600px; height: 170px;">
+            <div id="win-timeline" class="window timeline-dock-window" style="width: 640px; height: 300px;">
                 <div class="window-header">
-                    <span class="window-title">Sequenza Immagini GIF (Frame-by-Frame)</span>
+                    <span class="window-title">🎞️ SEQUENZA IMMAGINI GIF (FRAME-BY-FRAME)</span>
                     <div class="window-controls">
                         <button class="win-btn win-pin" title="Sopra Tutto (Mantieni in primo piano)">
                             <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M5 9l7-7 7 7"/></svg>
@@ -605,61 +623,78 @@
                     <button class="tab-btn active" data-tab="tab-timeline-content">🎞️ Sequenza Frame</button>
                 </div>
                 <div class="window-content timeline-workspace">
-                    <div id="tab-timeline-content" class="tab-content active-content" style="display: flex; flex-direction: column; height: 100%; width: 100%;">
-                        <div class="timeline-controls">
-                            <!-- Playback Controls -->
-                            <div class="btn-group">
-                                <button id="btn-play-gif" class="btn btn-accent btn-play-prominent" title="Riproduci / Pausa animazione GIF">
-                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-                                    Play
+                    <div id="tab-timeline-content" class="tab-content active-content timeline-tab-panel">
+                        <div class="timeline-compact" title="Controlli sequenza e keyframe">
+                            <div class="timeline-row timeline-row-play">
+                                <button id="btn-play-gif" class="btn btn-accent btn-tl-play" title="Riproduci / Pausa">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
                                 </button>
+                                <div class="tl-group tl-ms">
+                                    <span class="tl-lbl">ms</span>
+                                    <input type="number" id="timeline-delay" value="100" min="10" max="5000" title="Durata frame in millisecondi">
+                                    <button id="btn-apply-delay-all" class="btn btn-secondary btn-tl-mini" title="Applica ms a tutti i frame">Tutti</button>
+                                </div>
+                                <div class="tl-group tl-actions">
+                                    <button id="btn-duplicate-frame" class="btn btn-secondary btn-tl-icon" title="Duplica frame">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                    </button>
+                                    <button id="btn-delete-frame" class="btn btn-danger btn-tl-icon" title="Elimina frame">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+                                    </button>
+                                    <button id="btn-reverse-frames" class="btn btn-secondary btn-tl-icon" title="Inverti ordine frame">↔</button>
+                                </div>
+                                <div class="tl-group tl-prev">
+                                    <span class="tl-lbl">Prev</span>
+                                    <select id="timeline-speed-scale" class="select-field-sm" title="Velocità anteprima playback">
+                                        <option value="1">1x</option>
+                                        <option value="0.5">0.5x</option>
+                                        <option value="1.5">1.5x</option>
+                                        <option value="2">2x</option>
+                                    </select>
+                                </div>
+                                <button id="btn-optimize-gif" class="btn btn-secondary btn-tl-icon" title="Ottimizza GIF (rimuove frame statici duplicati)">⚡</button>
                             </div>
-                            
-                            <!-- Frame Delay -->
-                            <div class="input-field-inline">
-                                <span>Velocità (ms):</span>
-                                <input type="number" id="timeline-delay" value="100" min="10" max="5000" style="width: 65px; height: 22px;">
-                                <button id="btn-apply-delay-all" class="btn btn-secondary btn-sm" style="padding: 2px 4px; font-size: 10px;" title="Applica questa velocità a tutti i fotogrammi">Tutti</button>
-                            </div>
-    
-                            <span class="separator-v"></span>
-    
-                            <!-- Frame Actions -->
-                            <button id="btn-duplicate-frame" class="btn btn-secondary btn-sm" title="Duplica il fotogramma selezionato">
-                                <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                                Duplica
-                            </button>
-                            <button id="btn-delete-frame" class="btn btn-danger btn-sm" title="Elimina il fotogramma selezionato">
-                                <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
-                                Elimina
-                            </button>
-                            <button id="btn-reverse-frames" class="btn btn-secondary btn-sm" title="Inverti l'ordine temporale (al contrario)">
-                                <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-                                Inverti
-                            </button>
-                            
-                            <span class="separator-v"></span>
-    
-                            <!-- Optimize / Speed scale -->
-                            <div class="input-field-inline">
-                                <span>Velocità:</span>
-                                <select id="timeline-speed-scale" class="select-field-sm" style="height:22px;">
-                                    <option value="1">1x (Standard)</option>
-                                    <option value="0.5">0.5x (Rallentata)</option>
-                                    <option value="1.5">1.5x (Veloce)</option>
-                                    <option value="2">2x (Molto Veloce)</option>
+                            <div class="timeline-row timeline-row-kf">
+                                <span class="tl-kf-badge" title="Keyframe — anima il livello tra i frame">◆</span>
+                                <select id="keyframe-target" class="select-field-sm" title="Livello da animare">
+                                    <option value="main">Principale</option>
+                                    <option value="reference">Riferimento</option>
+                                    <option value="active">Attivo</option>
                                 </select>
+                                <label class="kf-chip kf-auto-label" title="Registra keyframe automaticamente">
+                                    <input type="checkbox" id="kf-auto-keyframe" checked> Auto
+                                </label>
+                                <div class="kf-chips">
+                                    <label class="kf-chip" title="X"><input type="checkbox" id="kf-prop-x" checked> X</label>
+                                    <label class="kf-chip" title="Y"><input type="checkbox" id="kf-prop-y" checked> Y</label>
+                                    <label class="kf-chip" title="Rotazione"><input type="checkbox" id="kf-prop-r" checked> R</label>
+                                    <label class="kf-chip" title="Opacità"><input type="checkbox" id="kf-prop-opacity" checked> Op</label>
+                                </div>
+                                <details class="kf-more">
+                                    <summary class="btn btn-secondary btn-tl-mini" title="Z, larghezza, altezza">+</summary>
+                                    <div class="kf-chips kf-chips-extra">
+                                        <label class="kf-chip"><input type="checkbox" id="kf-prop-z"> Z</label>
+                                        <label class="kf-chip"><input type="checkbox" id="kf-prop-w"> W</label>
+                                        <label class="kf-chip"><input type="checkbox" id="kf-prop-h"> H</label>
+                                    </div>
+                                </details>
+                                <div class="kf-nav">
+                                    <button type="button" id="btn-goto-prev-keyframe" class="btn btn-secondary btn-tl-mini" title="Keyframe precedente">◀</button>
+                                    <button type="button" id="btn-add-keyframe" class="btn btn-accent btn-tl-mini" title="Aggiungi keyframe sul frame corrente">◆</button>
+                                    <button type="button" id="btn-delete-keyframe" class="btn btn-secondary btn-tl-mini" title="Rimuovi keyframe">✕</button>
+                                    <button type="button" id="btn-goto-next-keyframe" class="btn btn-secondary btn-tl-mini" title="Keyframe successivo">▶</button>
+                                </div>
                             </div>
-                            
-                            <button id="btn-optimize-gif" class="btn btn-secondary btn-sm" title="Rendi la GIF più leggera eliminando frame identici statici">
-                                Ottimizza
-                            </button>
                         </div>
-                        
-                        <!-- Timeline Frames List -->
-                        <div class="frames-scroll-container" id="timeline-scroll-container">
-                            <div class="frames-track" id="timeline-frames-box">
-                                <!-- Popolato dinamicamente da JS -->
+
+                        <div class="timeline-dual-scroll" id="timeline-scroll-container">
+                            <div class="timeline-track-labels">
+                                <span class="track-label track-label-frames">Frm</span>
+                                <span class="track-label track-label-kf">KF</span>
+                            </div>
+                            <div class="timeline-tracks-viewport">
+                                <div class="frames-track" id="timeline-frames-box"></div>
+                                <div class="keyframes-track" id="keyframes-track-box"></div>
                             </div>
                         </div>
                     </div>
@@ -668,25 +703,6 @@
                 <div class="win-resize-handle-bl"></div>
                 <div class="win-resize-handle-tr"></div>
                 <div class="win-resize-handle-tl"></div>
-            </div>
-
-            <!-- IL DOCK DI CONTROLLO DELLE FINESTRE (Stile macOS in Basso al Centro) -->
-            <div id="quick-launcher" class="glass-dock" title="Barra di controllo: mostra e nascondi le finestre dell'app">
-                <button class="launcher-btn active-launcher" data-target="win-project" title="Mostra/Nascondi: Progetto & Temi Stile">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M12 18v-6M9 15l3 3 3-3"/></svg>
-                </button>
-                <button class="launcher-btn active-launcher" data-target="win-tools" title="Mostra/Nascondi: Strumenti Disegno & Livelli">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                </button>
-                <button class="launcher-btn active-launcher" data-target="win-canvas" title="Mostra/Nascondi: Tavola da Disegno (Canvas)">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg>
-                </button>
-                <button class="launcher-btn active-launcher" data-target="win-properties" title="Mostra/Nascondi: Proprietà & Filtri">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12"/></svg>
-                </button>
-                <button class="launcher-btn active-launcher" data-target="win-timeline" title="Mostra/Nascondi: Timeline Animazione GIF">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/></svg>
-                </button>
             </div>
 
         </main>

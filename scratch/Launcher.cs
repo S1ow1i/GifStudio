@@ -9,9 +9,6 @@ namespace GifStudioLauncher
 {
     class Program
     {
-        // Incrementare ad ogni build portable per forzare la ri-estrazione dell'app aggiornata
-        const string BUNDLE_VERSION = "1.0.1";
-
         [STAThread]
         static void Main(string[] args)
         {
@@ -20,37 +17,25 @@ namespace GifStudioLauncher
                 string exePath = Assembly.GetExecutingAssembly().Location;
                 string appDataDir = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
                 string portableRoot = Path.Combine(appDataDir, "GifStudioPortable");
-                string targetDir = Path.Combine(portableRoot, "app-" + BUNDLE_VERSION);
+                string currentHash = new FileInfo(exePath).LastWriteTimeUtc.Ticks.ToString();
+                string targetDir = Path.Combine(portableRoot, "app-" + currentHash);
                 string manifestPath = Path.Combine(portableRoot, "installed-bundle.txt");
                 string mainExe = Path.Combine(targetDir, "Gif Studio.exe");
-
                 bool needsExtract = true;
 
                 if (Directory.Exists(targetDir) && File.Exists(manifestPath) && File.Exists(mainExe))
                 {
                     string installed = File.ReadAllText(manifestPath).Trim();
-                    needsExtract = (installed != BUNDLE_VERSION);
+                    needsExtract = (installed != currentHash);
                 }
+
+                PurgeOldPortableBundles(portableRoot, targetDir);
 
                 if (needsExtract)
                 {
                     ExtractEmbeddedApp(exePath, targetDir);
                     Directory.CreateDirectory(portableRoot);
-                    File.WriteAllText(manifestPath, BUNDLE_VERSION);
-
-                    // Rimuovi versioni precedenti estratte
-                    try
-                    {
-                        foreach (string dir in Directory.GetDirectories(portableRoot))
-                        {
-                            string dirName = Path.GetFileName(dir);
-                            if (dirName.StartsWith("app-") && !string.Equals(dir, targetDir, StringComparison.OrdinalIgnoreCase))
-                            {
-                                Directory.Delete(dir, true);
-                            }
-                        }
-                    }
-                    catch { /* pulizia best-effort */ }
+                    File.WriteAllText(manifestPath, currentHash);
                 }
 
                 ProcessStartInfo startInfo = new ProcessStartInfo();
@@ -73,6 +58,23 @@ namespace GifStudioLauncher
                     MessageBoxIcon.Error
                 );
             }
+        }
+
+        static void PurgeOldPortableBundles(string portableRoot, string keepDir)
+        {
+            if (!Directory.Exists(portableRoot)) return;
+            try
+            {
+                foreach (string dir in Directory.GetDirectories(portableRoot))
+                {
+                    string dirName = Path.GetFileName(dir);
+                    if (dirName.StartsWith("app-") && !string.Equals(dir, keepDir, StringComparison.OrdinalIgnoreCase))
+                    {
+                        Directory.Delete(dir, true);
+                    }
+                }
+            }
+            catch { /* pulizia best-effort */ }
         }
 
         static void ExtractEmbeddedApp(string exePath, string targetDir)

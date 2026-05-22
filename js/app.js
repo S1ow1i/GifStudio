@@ -49,13 +49,159 @@ document.addEventListener("DOMContentLoaded", () => {
         redoStack: [],
         
         // Target attivo per la pipetta (copia colore)
-        colorPickerTarget: "brush", // "brush", "chroma", "replace-from", "replace-to"
-        exportDirectoryHandle: null
+        colorPickerTarget: "brush", // "brush", "chroma", "replace-from", "replace-to", "bg-remove", "bg-transparent-pick"
+        lastPickedTransparencyCoords: null,
+        exportDirectoryHandle: null,
+        autoKeyframe: true
     };
 
     let layoutRestoreComplete = false;
     let lastKnownScreen = { w: window.innerWidth, h: window.innerHeight };
     let cachedLayoutPayload = null;
+
+    const LAYOUT_STORAGE_KEY = "gifstudio_layout_v7";
+    const LAYOUT_SCREEN_KEY = "gifstudio_layout_v6_screen";
+    const WORKSPACE_GAP = 8;
+    const TIMELINE_HEIGHT = 150;
+    const DOCK_BOTTOM_RESERVE = 16;
+    const TIMELINE_TAB_IDS = ["tab-timeline-content"];
+
+    function getWorkspaceMetrics() {
+        const container = document.getElementById("window-container");
+        if (container) {
+            const r = container.getBoundingClientRect();
+            if (r.width > 100 && r.height > 100) {
+                return {
+                    w: Math.max(320, Math.round(r.width)),
+                    h: Math.max(240, Math.round(r.height)),
+                    gap: WORKSPACE_GAP,
+                    timelineH: TIMELINE_HEIGHT,
+                    dockReserve: getDockReservePx()
+                };
+            }
+        }
+        return {
+            w: window.innerWidth,
+            h: Math.max(240, window.innerHeight - getTopBarHeightPx()),
+            gap: WORKSPACE_GAP,
+            timelineH: TIMELINE_HEIGHT,
+            dockReserve: getDockReservePx()
+        };
+    }
+
+    function getDockReservePx() {
+        return DOCK_BOTTOM_RESERVE;
+    }
+
+    function getTopBarHeightPx() {
+        const bar = document.getElementById("top-bar");
+        return bar ? Math.max(52, bar.offsetHeight) : 76;
+    }
+
+    function getTimelineColumnBounds() {
+        const ws = getWorkspaceMetrics();
+        const gap = ws.gap;
+        const projectW = parseInt(document.getElementById("win-project")?.style.width, 10) || 400;
+        const propsW = parseInt(document.getElementById("win-properties")?.style.width, 10) || 680;
+        
+        const canvasLeft = gap + projectW + gap;
+        const canvasWidth = Math.max(400, ws.w - canvasLeft - propsW - gap * 2);
+        
+        const timelineLeft = gap;
+        const timelineWidth = ws.w - propsW - gap * 3; // Force exact stop before properties
+
+        return { canvasLeft, canvasWidth, timelineLeft, timelineWidth, gap, ws };
+    }
+
+    function computeTimelineDockLayout(timelineHeightOverride) {
+        const { canvasLeft, canvasWidth, timelineLeft, timelineWidth, gap, ws } = getTimelineColumnBounds();
+        const dockReserve = getDockReservePx();
+        const timeline = document.getElementById("win-timeline");
+        let timelineH = timelineHeightOverride;
+
+        if (timelineH == null || isNaN(timelineH)) {
+            const currentH = timeline ? parseInt(timeline.style.height, 10) : NaN;
+            const useSaved = !isNaN(currentH) && currentH > 100 &&
+                timeline && !timeline.classList.contains("minimized-window");
+            timelineH = useSaved ? currentH : ws.timelineH;
+        }
+
+        const maxTimelineH = ws.h - gap * 2 - 80;
+        timelineH = Math.max(180, Math.min(timelineH, maxTimelineH));
+        const canvasH = Math.max(180, ws.h - timelineH - gap);
+        const timelineTop = ws.h - timelineH - gap;
+
+        return {
+            canvasLeft,
+            canvasWidth,
+            timelineLeft,
+            timelineWidth,
+            gap,
+            ws,
+            dockReserve,
+            timelineH,
+            canvasH,
+            timelineTop,
+            canvasTop: gap
+        };
+    }
+
+    function applyTimelineDockLayout(layout, options = {}) {
+        const dock = layout || computeTimelineDockLayout();
+        const timeline = document.getElementById("win-timeline");
+        const canvas = document.getElementById("win-canvas");
+        if (!timeline || !canvas) return dock;
+
+        timeline.style.display = "flex";
+        timeline.style.visibility = "visible";
+        timeline.classList.remove("minimized-window");
+
+        timeline.style.left = `${dock.timelineLeft}px`;
+        timeline.style.width = `${dock.timelineWidth}px`;
+        timeline.style.top = `${dock.timelineTop}px`;
+        timeline.style.height = `${dock.timelineH}px`;
+        timeline.style.zIndex = "350";
+
+        canvas.style.left = `${dock.canvasLeft}px`;
+        canvas.style.width = `${dock.canvasWidth}px`;
+        canvas.style.top = `${dock.canvasTop}px`;
+        canvas.style.height = `${dock.canvasH}px`;
+
+        const minBtn = timeline.querySelector(".win-minimize");
+        if (minBtn) minBtn.innerHTML = "&#8722;";
+
+        if (state.windows["win-timeline"]) {
+            Object.assign(state.windows["win-timeline"], {
+                left: dock.timelineLeft,
+                top: dock.timelineTop,
+                width: dock.timelineWidth,
+                height: dock.timelineH,
+                visible: true,
+                isMinimized: false
+            });
+        }
+        if (state.windows["win-canvas"]) {
+            Object.assign(state.windows["win-canvas"], {
+                left: dock.canvasLeft,
+                top: dock.canvasTop,
+                width: dock.canvasWidth,
+                height: dock.canvasH
+            });
+        }
+
+        if (options.repairTabs !== false) repairTimelineWindow();
+        if (options.clamp !== false) clampWindowToViewport(timeline);
+        if (options.rebuildFrames && dom.framesTrack) buildTimelineUI();
+
+        return dock;
+    }
+
+    function migrateLegacyLayoutStorage() {
+        try {
+            localStorage.removeItem("gifstudio_layout_v5");
+            localStorage.removeItem("gifstudio_layout_v5_screen");
+        } catch (e) {}
+    }
 
     // ======================================================================
     // 2. ELEMENTI DELLA SCHERMATA (DOM)
@@ -123,14 +269,36 @@ document.addEventListener("DOMContentLoaded", () => {
         // Filtri e Trasparenza Sfondo
         bgRemoveActive: document.getElementById("bg-remove-active"),
         bgRemoveColor: document.getElementById("bg-remove-color"),
-        btnPickBgColor: document.getElementById("btn-pick-bg-color"),
+        btnPickBgRemoveColor: document.getElementById("btn-pick-bg-remove-color"),
         bgRemoveTolerance: document.getElementById("bg-remove-tolerance"),
         bgRemoveToleranceSlider: document.getElementById("bg-remove-tolerance-slider"),
+        bgTransparentColor: document.getElementById("bg-transparent-color"),
+        btnPickTransparentColor: document.getElementById("btn-pick-transparent-color"),
+        bgTransparentTolerance: document.getElementById("bg-transparent-tolerance"),
+        bgTransparentToleranceSlider: document.getElementById("bg-transparent-tolerance-slider"),
+        transparentPickStatus: document.getElementById("transparent-pick-status"),
+        btnAddTransparencyRule: document.getElementById("btn-add-transparency-rule"),
+        transparencyRulesListBox: document.getElementById("transparency-rules-list-box"),
+        bgTransparencyType: document.getElementById("bg-transparency-type"),
+        keyframeTarget: document.getElementById("keyframe-target"),
+        btnAddKeyframe: document.getElementById("btn-add-keyframe"),
+        btnDeleteKeyframe: document.getElementById("btn-delete-keyframe"),
+        kfPropX: document.getElementById("kf-prop-x"),
+        kfPropY: document.getElementById("kf-prop-y"),
+        kfPropZ: document.getElementById("kf-prop-z"),
+        kfPropR: document.getElementById("kf-prop-r"),
+        kfPropOpacity: document.getElementById("kf-prop-opacity"),
+        kfPropW: document.getElementById("kf-prop-w"),
+        kfPropH: document.getElementById("kf-prop-h"),
         filterBorderRadius: document.getElementById("filter-border-radius"),
         btnApplyCorners: document.getElementById("btn-apply-corners"),
         
         // Timeline e Riproduttore
         framesTrack: document.getElementById("timeline-frames-box"),
+        keyframesTrackBox: document.getElementById("keyframes-track-box"),
+        kfAutoKeyframe: document.getElementById("kf-auto-keyframe"),
+        btnGotoPrevKeyframe: document.getElementById("btn-goto-prev-keyframe"),
+        btnGotoNextKeyframe: document.getElementById("btn-goto-next-keyframe"),
         btnPlayGif: document.getElementById("btn-play-gif"),
         btnPauseGif: document.getElementById("btn-pause-gif"),
         timelineDelay: document.getElementById("timeline-delay"),
@@ -154,7 +322,7 @@ document.addEventListener("DOMContentLoaded", () => {
         uiFontSize: document.getElementById("ui-font-size"),
         uiWindowRadius: document.getElementById("ui-window-radius"),
         uiRadiusVal: document.getElementById("ui-radius-val"),
-        btnResetLayout: document.getElementById("btn-reset-layout"),
+        btnDefaultLayout: document.getElementById("btn-default-layout"),
 
         // Gomma avanzata e sostituzione colore
         xyzTextSize: document.getElementById("xyz-text-size"),
@@ -200,6 +368,324 @@ document.addEventListener("DOMContentLoaded", () => {
         return frame.layers.find(l => l.id === state.activeLayerId);
     }
 
+    const KEYFRAME_PROPS = ["x", "y", "z", "r", "opacity", "w", "h"];
+
+    function ensureLayerTransparencyRules(layer) {
+        if (!layer) return;
+        if (!Array.isArray(layer.transparencyRules)) layer.transparencyRules = [];
+    }
+
+    function ensureLayerKeyframes(layer) {
+        if (!layer) return;
+        if (!layer.keyframes || typeof layer.keyframes !== "object") layer.keyframes = {};
+    }
+
+    function findLayerInFrame(frame, layerRef) {
+        if (!frame || !layerRef) return null;
+        let target = frame.layers.find(l => l.id === layerRef.id);
+        if (!target) {
+            const activeFrame = getActiveFrame();
+            if (activeFrame) {
+                const idx = activeFrame.layers.findIndex(l => l.id === layerRef.id);
+                if (idx !== -1 && idx < frame.layers.length) target = frame.layers[idx];
+            }
+        }
+        return target;
+    }
+
+    function isHomologousLayer(layerA, layerB) {
+        if (!layerA || !layerB) return false;
+        if (layerA.id === layerB.id) return true;
+        if (layerA.groupId && layerB.groupId && layerA.groupId === layerB.groupId) return true;
+        
+        let frameA = null, frameB = null;
+        for (const f of state.frames) {
+            if (f.layers.includes(layerA)) frameA = f;
+            if (f.layers.includes(layerB)) frameB = f;
+            if (frameA && frameB) break;
+        }
+        
+        if (frameA && frameB) {
+            const idxA = frameA.layers.indexOf(layerA);
+            const idxB = frameB.layers.indexOf(layerB);
+            return idxA === idxB && layerA.type === layerB.type;
+        }
+        
+        return layerA.name === layerB.name && layerA.type === layerB.type;
+    }
+
+    function propagateLayerKeyframes(sourceLayer) {
+        if (!sourceLayer) return;
+        ensureLayerKeyframes(sourceLayer);
+        const keyframesCopy = JSON.parse(JSON.stringify(sourceLayer.keyframes));
+        state.frames.forEach((frame) => {
+            const target = findLayerInFrame(frame, sourceLayer);
+            if (target) target.keyframes = JSON.parse(JSON.stringify(keyframesCopy));
+        });
+    }
+
+    function propagateLayerTransparencyRules(sourceLayer) {
+        if (!sourceLayer) return;
+        ensureLayerTransparencyRules(sourceLayer);
+        const rulesCopy = sourceLayer.transparencyRules.map(r => ({ ...r }));
+        state.frames.forEach((frame) => {
+            const target = findLayerInFrame(frame, sourceLayer);
+            if (target) {
+                target.transparencyRules = rulesCopy.map(r => ({ ...r }));
+                filterCache.delete(target.id);
+            }
+        });
+        filterCache.delete(sourceLayer.id);
+    }
+
+    function updateTransparentPickStatus() {
+        if (!dom.transparentPickStatus) return;
+        if (state.lastPickedTransparencyCoords) {
+            const c = state.lastPickedTransparencyCoords;
+            dom.transparentPickStatus.style.display = "block";
+            dom.transparentPickStatus.style.color = "var(--accent-color)";
+            dom.transparentPickStatus.textContent =
+                `Punto selezionato: ${Math.round(c.x)}, ${Math.round(c.y)} — clicca "Aggiungi Trasparenza"`;
+        } else {
+            dom.transparentPickStatus.style.display = "none";
+            dom.transparentPickStatus.textContent = "";
+        }
+    }
+
+    function clearTransparentPickStatus() {
+        state.lastPickedTransparencyCoords = null;
+        updateTransparentPickStatus();
+    }
+
+    function getTransparencyRuleDraft() {
+        const typeVal = dom.bgTransparencyType ? dom.bgTransparencyType.value : "flood";
+        const color = dom.bgTransparentColor ? dom.bgTransparentColor.value : "#ffffff";
+        const tolerance = parseInt(dom.bgTransparentTolerance && dom.bgTransparentTolerance.value, 10);
+        const rule = {
+            type: typeVal,
+            color,
+            tolerance: Number.isFinite(tolerance) ? tolerance : 20
+        };
+        if (typeVal === "flood" && state.lastPickedTransparencyCoords) {
+            rule.seedX = state.lastPickedTransparencyCoords.x;
+            rule.seedY = state.lastPickedTransparencyCoords.y;
+        }
+        return rule;
+    }
+
+    function addTransparencyRuleFromUI() {
+        const layer = getActiveLayer();
+        if (!layer || layer.isReference || layer.locked) {
+            alert("Seleziona un livello immagine modificabile.");
+            return false;
+        }
+
+        const draft = getTransparencyRuleDraft();
+        if (draft.type === "flood" && (draft.seedX == null || draft.seedY == null)) {
+            alert("Per \"Area Unita\" usa la pipetta sulla tavola per scegliere il punto di partenza.");
+            return false;
+        }
+
+        saveState();
+        ensureLayerTransparencyRules(layer);
+        layer.transparencyRules.push(draft);
+
+        if (state.editScope === "global") {
+            propagateLayerTransparencyRules(layer);
+        } else {
+            filterCache.delete(layer.id);
+        }
+
+        clearTransparentPickStatus();
+        updateTransparencyRulesUI();
+        requestRender();
+        return true;
+    }
+
+    function getMainImageLayer(frame) {
+        if (!frame) return null;
+        return frame.layers.find(l => l.type === "image" && !l.isReference) || null;
+    }
+
+    function getReferenceLayer(frame) {
+        if (!frame) return null;
+        return frame.layers.find(l => l.isReference === true) || null;
+    }
+
+    function resolveKeyframeTargetLayer(targetType) {
+        const frame = getActiveFrame();
+        if (!frame) return null;
+        if (targetType === "reference") return getReferenceLayer(frame);
+        if (targetType === "main") return getMainImageLayer(frame);
+        return getActiveLayer();
+    }
+
+    function getSortedKeyframeFrames(layer) {
+        ensureLayerKeyframes(layer);
+        return Object.keys(layer.keyframes).map(Number).filter(n => !isNaN(n)).sort((a, b) => a - b);
+    }
+
+    function interpolateLayerTransform(layer, frameIndex) {
+        ensureLayerKeyframes(layer);
+        const keys = getSortedKeyframeFrames(layer);
+        if (keys.length === 0) return null;
+
+        const result = {};
+        KEYFRAME_PROPS.forEach((prop) => {
+            let prevF = null;
+            let nextF = null;
+            keys.forEach((k) => {
+                const kf = layer.keyframes[k];
+                if (!kf || kf[prop] === undefined) return;
+                if (k <= frameIndex) prevF = k;
+                if (k >= frameIndex && nextF === null) nextF = k;
+            });
+            if (prevF === null && nextF === null) return;
+            if (prevF === null) result[prop] = layer.keyframes[nextF][prop];
+            else if (nextF === null) result[prop] = layer.keyframes[prevF][prop];
+            else if (prevF === nextF) result[prop] = layer.keyframes[prevF][prop];
+            else {
+                const t = (frameIndex - prevF) / (nextF - prevF);
+                const a = layer.keyframes[prevF][prop];
+                const b = layer.keyframes[nextF][prop];
+                result[prop] = a + (b - a) * t;
+            }
+        });
+        return Object.keys(result).length ? result : null;
+    }
+
+    function applyKeyframesForTimelineFrame(frameIndex) {
+        const frame = state.frames[frameIndex];
+        if (!frame) return;
+        frame.layers.forEach((layer) => {
+            const interp = interpolateLayerTransform(layer, frameIndex);
+            if (!interp) return;
+            Object.assign(layer, interp);
+        });
+        frame.layers.sort((a, b) => (a.z || 0) - (b.z || 0));
+    }
+
+    function frameHasAnyKeyframe(frameIndex) {
+        const frame = state.frames[frameIndex];
+        if (!frame) return false;
+        return frame.layers.some((layer) => {
+            ensureLayerKeyframes(layer);
+            return layer.keyframes[frameIndex] !== undefined;
+        });
+    }
+
+    function collectKeyframePropsFromLayer(layer) {
+        const props = {};
+        if (dom.kfPropX && dom.kfPropX.checked) props.x = layer.x;
+        if (dom.kfPropY && dom.kfPropY.checked) props.y = layer.y;
+        if (dom.kfPropZ && dom.kfPropZ.checked) props.z = layer.z;
+        if (dom.kfPropR && dom.kfPropR.checked) props.r = layer.r;
+        if (dom.kfPropOpacity && dom.kfPropOpacity.checked) props.opacity = layer.opacity;
+        if (dom.kfPropW && dom.kfPropW.checked) props.w = layer.w;
+        if (dom.kfPropH && dom.kfPropH.checked) props.h = layer.h;
+        return props;
+    }
+
+    function addKeyframeAtCurrentFrame(layer) {
+        if (!layer) return;
+        const props = collectKeyframePropsFromLayer(layer);
+        if (!Object.keys(props).length) {
+            alert("Seleziona almeno un asse da registrare nel keyframe (X, Y, R, Opacità…).");
+            return;
+        }
+        saveState();
+        upsertKeyframeAtFrame(layer, state.activeFrameIndex, props);
+        buildTimelineUI();
+        requestRender();
+    }
+
+    function deleteKeyframeAtFrame(layer, frameIndex) {
+        if (!layer) return false;
+        ensureLayerKeyframes(layer);
+        const fi = frameIndex !== undefined ? frameIndex : state.activeFrameIndex;
+        if (!layer.keyframes[fi]) return false;
+        saveState();
+        delete layer.keyframes[fi];
+        if (!Object.keys(layer.keyframes).length) layer.keyframes = {};
+        propagateLayerKeyframes(layer);
+        buildTimelineUI();
+        applyKeyframesForTimelineFrame(state.activeFrameIndex);
+        updateXYZControlsUI();
+        requestRender();
+        return true;
+    }
+
+    function deleteKeyframeAtCurrentFrame(layer) {
+        deleteKeyframeAtFrame(layer, state.activeFrameIndex);
+    }
+
+    function upsertKeyframeAtFrame(layer, frameIndex, propsOverride) {
+        if (!layer) return false;
+        ensureLayerKeyframes(layer);
+        const fi = frameIndex !== undefined ? frameIndex : state.activeFrameIndex;
+        const props = propsOverride || collectKeyframePropsFromLayer(layer);
+        if (!Object.keys(props).length) return false;
+        if (!layer.keyframes[fi]) layer.keyframes[fi] = {};
+        Object.assign(layer.keyframes[fi], props);
+        propagateLayerKeyframes(layer);
+        return true;
+    }
+
+    function toggleKeyframeAtFrame(layer, frameIndex) {
+        if (!layer) return;
+        ensureLayerKeyframes(layer);
+        const fi = frameIndex !== undefined ? frameIndex : state.activeFrameIndex;
+        if (layer.keyframes[fi]) {
+            deleteKeyframeAtFrame(layer, fi);
+        } else {
+            saveState();
+            upsertKeyframeAtFrame(layer, fi);
+            buildTimelineUI();
+            requestRender();
+        }
+    }
+
+    function layerHasAnyKeyframes(layer) {
+        if (!layer) return false;
+        ensureLayerKeyframes(layer);
+        return getSortedKeyframeFrames(layer).length > 0;
+    }
+
+    function gotoAdjacentKeyframe(direction) {
+        const targetType = dom.keyframeTarget ? dom.keyframeTarget.value : "active";
+        const layer = resolveKeyframeTargetLayer(targetType);
+        if (!layer) {
+            alert("Nessun livello disponibile per i keyframe.");
+            return;
+        }
+        const keys = getSortedKeyframeFrames(layer);
+        if (!keys.length) {
+            alert("Nessun keyframe registrato su questo livello.");
+            return;
+        }
+        const cur = state.activeFrameIndex;
+        let target = null;
+        if (direction < 0) {
+            for (let i = keys.length - 1; i >= 0; i--) {
+                if (keys[i] < cur) { target = keys[i]; break; }
+            }
+            if (target === null) target = keys[keys.length - 1];
+        } else {
+            for (let i = 0; i < keys.length; i++) {
+                if (keys[i] > cur) { target = keys[i]; break; }
+            }
+            if (target === null) target = keys[0];
+        }
+        selectFrame(target);
+    }
+
+    function maybeAutoRecordKeyframe(layer) {
+        if (!layer || !state.autoKeyframe) return;
+        const fi = state.activeFrameIndex;
+        if (!upsertKeyframeAtFrame(layer, fi)) return;
+        buildTimelineUI();
+    }
+
     function hexToRgb(hex) {
         const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
         return result ? {
@@ -235,7 +721,9 @@ document.addEventListener("DOMContentLoaded", () => {
                         ...l,
                         canvasImage: l.canvasImage ? cloneCanvas(l.canvasImage) : null,
                         drawingCanvas: l.drawingCanvas ? cloneCanvas(l.drawingCanvas) : null,
-                        gifFrames: l.gifFrames ? cloneGifFrameCanvases(l.gifFrames) : undefined
+                        gifFrames: l.gifFrames ? cloneGifFrameCanvases(l.gifFrames) : undefined,
+                        keyframes: l.keyframes ? JSON.parse(JSON.stringify(l.keyframes)) : {},
+                        transparencyRules: l.transparencyRules ? l.transparencyRules.map(r => ({ ...r })) : []
                     };
                 })
             };
@@ -244,38 +732,52 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function cloneGifFrameCanvases(gifFrames) {
         if (!gifFrames || !gifFrames.length) return [];
-        return gifFrames.map(fc => {
+        return gifFrames.map((fc, idx) => {
             const c = document.createElement("canvas");
             c.width = fc.width;
             c.height = fc.height;
             c.getContext("2d").drawImage(fc, 0, 0);
+            c.gifFrameIndex = fc.gifFrameIndex !== undefined ? fc.gifFrameIndex : idx;
             return c;
         });
     }
 
     function getFilterCacheKey(layer, sourceImg) {
         const replacementsHash = JSON.stringify(state.colorReplacements);
+        const transparencyHash = layer.transparencyRules ? JSON.stringify(layer.transparencyRules) : "";
         const bgRemoveHash = layer.bgRemoveActive
             ? `bg_${layer.bgRemoveColor}_${layer.bgRemoveTolerance}_${layer.bgRemoveSeedX}_${layer.bgRemoveSeedY}`
             : "bg_none";
-        let framePart = `tl_${state.activeFrameIndex}`;
-        if (layer.isAnimatedGif && layer.gifFrames && layer.gifFrames.length > 0) {
-            const refFrameIdx = state.activeFrameIndex % layer.gifFrames.length;
-            framePart += `_gif_${refFrameIdx}`;
+        
+        let gifFramePart = "static";
+        if (layer.gifFrames && layer.gifFrames.length > 0) {
+            let idx = -1;
+            if (sourceImg && sourceImg.gifFrameIndex !== undefined) {
+                idx = sourceImg.gifFrameIndex;
+            } else {
+                idx = layer.gifFrames.indexOf(sourceImg);
+            }
+            
+            if (idx !== -1) {
+                gifFramePart = `gif_${idx}`;
+            } else {
+                gifFramePart = `gif_active_${state.activeFrameIndex % layer.gifFrames.length}`;
+            }
         }
+        
         const srcPart = sourceImg && sourceImg.width ? `_s${sourceImg.width}x${sourceImg.height}` : "";
-        return `${layer.id}_${framePart}${srcPart}_filters_${replacementsHash}_${bgRemoveHash}`;
+        return `${layer.id}_${gifFramePart}${srcPart}_filters_${replacementsHash}_${transparencyHash}_${bgRemoveHash}`;
     }
 
     const TAB_DEFAULT_ORIGINS = {
         "tab-canvas-content": "win-canvas",
         "tab-project-file": "win-project",
         "tab-project-style": "win-project",
-        "tab-tools-draw": "win-tools",
-        "tab-tools-layers": "win-tools",
-        "tab-prop-xyz": "win-properties",
+        "tab-project-layers": "win-project",
         "tab-prop-bg": "win-properties",
+        "tab-tools-draw": "win-properties",
         "tab-prop-colors": "win-properties",
+        "tab-prop-xyz": "win-properties",
         "tab-timeline-content": "win-timeline"
     };
 
@@ -291,6 +793,25 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    function applyDefaultTabLayout() {
+        document.querySelectorAll(".tab-btn").forEach(tab => {
+            const tabId = tab.getAttribute("data-tab");
+            const origin = TAB_DEFAULT_ORIGINS[tabId] || tab.getAttribute("data-origin-win");
+            if (!origin) return;
+            tab.setAttribute("data-origin-win", origin);
+            const originWin = document.getElementById(origin);
+            const tabContent = document.getElementById(tabId);
+            if (!originWin || !tabContent) return;
+            const originHeader = originWin.querySelector(".window-tabs-header");
+            const originContent = originWin.querySelector(".window-content");
+            if (!originHeader || !originContent) return;
+            if (!originWin.contains(tab)) {
+                originHeader.appendChild(tab);
+                originContent.appendChild(tabContent);
+            }
+        });
+    }
+
     function collectUiPreferences() {
         const root = document.documentElement;
         const themeClass = [...root.classList].find(c => c.startsWith("theme-")) || "theme-dark";
@@ -301,7 +822,7 @@ document.addEventListener("DOMContentLoaded", () => {
             colorText: dom.uiColorText ? dom.uiColorText.value : "#f1f5f9",
             colorAccent: dom.uiColorAccent ? dom.uiColorAccent.value : "#00ffcc",
             fontFamily: dom.uiFontFamily ? dom.uiFontFamily.value : "Inter",
-            fontSize: dom.uiFontSize ? dom.uiFontSize.value : "13",
+            fontSize: dom.uiFontSize ? dom.uiFontSize.value : "15",
             windowRadius: dom.uiWindowRadius ? dom.uiWindowRadius.value : "10",
             editScope: state.editScope
         };
@@ -351,12 +872,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function collectWindowLayout() {
-        const sw = window.innerWidth;
-        const sh = window.innerHeight;
+        const ws = getWorkspaceMetrics();
         const layoutData = {};
         document.querySelectorAll(".window").forEach(win => {
             if (!win.id) return;
-            layoutData[win.id] = normalizeWindowGeometry(readWindowGeometry(win), sw, sh);
+            layoutData[win.id] = normalizeWindowGeometry(readWindowGeometry(win), ws.w, ws.h);
         });
         return layoutData;
     }
@@ -406,16 +926,30 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function clampWindowToViewport(win) {
+        const ws = getWorkspaceMetrics();
         const width = parseInt(win.style.width, 10) || win.offsetWidth || 300;
         const height = parseInt(win.style.height, 10) || win.offsetHeight || 200;
         let left = parseInt(win.style.left, 10) || 0;
         let top = parseInt(win.style.top, 10) || 0;
 
-        left = Math.max(-width + 120, Math.min(left, window.innerWidth - 120));
-        top = Math.max(48, Math.min(top, window.innerHeight - 48));
+        left = Math.max(-width + 120, Math.min(left, ws.w - 120));
+
+        const minH = win.id === "win-timeline" ? 100 : 40;
+        const h = Math.max(minH, Math.min(height, ws.h - ws.gap));
+        win.style.height = `${h}px`;
+        top = Math.max(ws.gap, Math.min(top, ws.h - h - ws.gap));
 
         win.style.left = `${left}px`;
         win.style.top = `${top}px`;
+    }
+
+    function clampDragPosition(win, newLeft, newTop) {
+        const ws = getWorkspaceMetrics();
+        const width = parseInt(win.style.width, 10) || win.offsetWidth || 300;
+        const height = parseInt(win.style.height, 10) || win.offsetHeight || 200;
+        const left = Math.max(-width + 120, Math.min(newLeft, ws.w - 120));
+        const top = Math.max(ws.gap, Math.min(newTop, ws.h - height - ws.gap));
+        return { left, top };
     }
 
     function collectTabLayout() {
@@ -456,11 +990,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function saveAllAppPreferences() {
+        const ws = getWorkspaceMetrics();
         const payload = {
-            version: 3,
+            version: 4,
             ui: collectUiPreferences(),
             layout: collectWindowLayout(),
-            screen: { w: window.innerWidth, h: window.innerHeight },
+            screen: { w: ws.w, h: ws.h },
             tabs: collectTabLayout(),
             names: {}
         };
@@ -476,8 +1011,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         try {
             localStorage.setItem("gifstudio_ui_prefs_v1", JSON.stringify(payload.ui));
-            localStorage.setItem("gifstudio_layout_v5", JSON.stringify(payload.layout));
-            localStorage.setItem("gifstudio_layout_v5_screen", JSON.stringify(payload.screen));
+            localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(payload.layout));
+            localStorage.setItem(LAYOUT_SCREEN_KEY, JSON.stringify(payload.screen));
             localStorage.setItem("gifstudio_tab_layout_v1", JSON.stringify(payload.tabs));
             localStorage.setItem("gifstudio_custom_names_v1", JSON.stringify(payload.names));
         } catch (e) {
@@ -533,6 +1068,7 @@ document.addEventListener("DOMContentLoaded", () => {
             root.style.setProperty("--window-radius", `${prefs.windowRadius}px`);
             if (dom.uiRadiusVal) dom.uiRadiusVal.innerText = `${prefs.windowRadius}px`;
         }
+        if (typeof applyCustomColors === "function") applyCustomColors();
         if (prefs.editScope === "global" && dom.btnScopeGlobal && dom.btnScopeFrame) {
             state.editScope = "global";
             dom.btnScopeGlobal.classList.add("active");
@@ -550,13 +1086,40 @@ document.addEventListener("DOMContentLoaded", () => {
     function applySavedWindowLayout(layoutData, referenceScreen) {
         if (!layoutData) return;
 
-        const requiredIds = ["win-project", "win-tools", "win-properties", "win-canvas", "win-timeline"];
-        if (!requiredIds.every(id => layoutData.hasOwnProperty(id))) return;
+        const requiredIds = ["win-project", "win-properties", "win-canvas"];
+        if (!requiredIds.every(id => layoutData.hasOwnProperty(id))) {
+            arrangeWindowsDefault();
+            forceTimelineLayout();
+            return;
+        }
 
-        const screenW = window.innerWidth;
-        const screenH = window.innerHeight;
-        const refW = (referenceScreen && referenceScreen.w) || screenW;
-        const refH = (referenceScreen && referenceScreen.h) || screenH;
+        const ws = getWorkspaceMetrics();
+
+        if (referenceScreen && (referenceScreen.w < 600 || referenceScreen.h < 400)) {
+            console.warn("Screen reference too small in saved layout, resetting to default layout");
+            arrangeWindowsDefault();
+            forceTimelineLayout();
+            return;
+        }
+
+        for (const [id, val] of Object.entries(layoutData)) {
+            if (id === "win-timeline") continue;
+            if (val) {
+                const w = val.width !== undefined ? val.width : (val.widthRatio ? val.widthRatio * ws.w : 0);
+                const h = val.height !== undefined ? val.height : (val.heightRatio ? val.heightRatio * ws.h : 0);
+                if (w < 50 || h < 50) {
+                    console.warn(`Saved window layout for ${id} is too small (${w}x${h}), resetting to default layout`);
+                    arrangeWindowsDefault();
+                    forceTimelineLayout();
+                    return;
+                }
+            }
+        }
+
+        const refW = (referenceScreen && referenceScreen.w) || ws.w;
+        const refH = (referenceScreen && referenceScreen.h) || ws.h;
+        const useRefH = (refH > ws.h + 40) ? ws.h : refH;
+        const useRefW = refW;
 
         for (const [id, val] of Object.entries(layoutData)) {
             const win = document.getElementById(id);
@@ -564,13 +1127,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
             let stored = val;
             if (stored.leftRatio === undefined) {
-                stored = normalizeWindowGeometry(stored, refW, refH);
+                stored = normalizeWindowGeometry(stored, useRefW, useRefH);
             }
 
-            const geometry = denormalizeWindowGeometry(stored, screenW, screenH);
+            const geometry = denormalizeWindowGeometry(stored, ws.w, ws.h);
+            if (id === "win-timeline") {
+                geometry.visible = true;
+                geometry.isMinimized = false;
+            }
             applyGeometryToWindow(win, geometry);
             clampWindowToViewport(win);
         }
+        applyDefaultTabLayout();
+        repairTimelineWindow();
+        ensureCoreWindowsVisible();
     }
 
     function applySavedFloatingLayouts(floatingLayouts) {
@@ -658,6 +1228,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
             floatingWindows.forEach(fw => {
                 if (!fw.tabs || !fw.tabs.length) return;
+                fw.tabs = fw.tabs.filter(tabId => !TIMELINE_TAB_IDS.includes(tabId));
+                if (!fw.tabs.length) return;
 
                 let stored = fw;
                 if (fw.leftRatio === undefined && cachedLayoutPayload && cachedLayoutPayload.screen) {
@@ -714,6 +1286,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const byWindow = {};
             assignments.forEach(a => {
                 if (!a.tabId || !a.windowId) return;
+                if (TIMELINE_TAB_IDS.includes(a.tabId)) a.windowId = "win-timeline";
                 if (a.windowId.startsWith("win-dyn-")) return;
                 if (!byWindow[a.windowId]) byWindow[a.windowId] = [];
                 byWindow[a.windowId].push(a);
@@ -739,17 +1312,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
             setupTabHandlers();
             updateTabHeadersDropzones();
+            repairTimelineWindow();
             if (typeof window.updateDynamicUI === "function") window.updateDynamicUI();
         } catch (e) {
             console.warn("Layout schede non ripristinato:", e);
+            repairTimelineWindow();
         }
     }
 
     function buildPayloadFromLocalStorage() {
         try {
             const ui = localStorage.getItem("gifstudio_ui_prefs_v1");
-            const layout = localStorage.getItem("gifstudio_layout_v5");
-            const screen = localStorage.getItem("gifstudio_layout_v5_screen");
+            const layout = localStorage.getItem(LAYOUT_STORAGE_KEY);
+            const screen = localStorage.getItem(LAYOUT_SCREEN_KEY);
             const tabs = localStorage.getItem("gifstudio_tab_layout_v1");
             const names = localStorage.getItem("gifstudio_custom_names_v1");
             if (!ui && !layout && !tabs) return null;
@@ -786,9 +1361,16 @@ document.addEventListener("DOMContentLoaded", () => {
             applySavedTabLayout(payload.tabs);
         }
 
+        repairTimelineWindow();
+
         if (payload.layout) {
             applySavedWindowLayout(payload.layout, payload.screen);
+        } else {
+            arrangeWindowsDefault();
         }
+
+        repairTimelineWindow();
+        ensureCoreWindowsVisible();
 
         if (payload.tabs && payload.tabs.floatingWindows) {
             applySavedFloatingLayouts(payload.tabs.floatingWindows);
@@ -816,6 +1398,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (!payload) return null;
 
+        if ((payload.version || 0) < 4) {
+            payload.layout = null;
+        }
+
         cachedLayoutPayload = payload;
         applySavedLayoutPayload(payload);
         return payload;
@@ -837,12 +1423,103 @@ document.addEventListener("DOMContentLoaded", () => {
         targetWin.querySelectorAll(".tab-btn").forEach(t => t.classList.remove("active"));
         tabBtn.classList.add("active");
         targetWin.querySelectorAll(".tab-content").forEach(content => {
-            content.classList.toggle("active-content", content.id === tabId);
+            const isActive = content.id === tabId;
+            content.classList.toggle("active-content", isActive);
+            content.style.display = isActive ? "" : "none";
         });
+    }
+
+    const CORE_WINDOW_IDS = ["win-project", "win-properties", "win-canvas", "win-timeline"];
+
+    function ensureCoreWindowsVisible() {
+        CORE_WINDOW_IDS.forEach((id) => {
+            const win = document.getElementById(id);
+            if (!win) return;
+            win.style.display = "flex";
+            win.classList.remove("minimized-window");
+            const minBtn = win.querySelector(".win-minimize");
+            if (minBtn) minBtn.innerHTML = "&#8722;";
+            const btn = document.querySelector(`.launcher-btn[data-target="${id}"]`);
+            if (btn) btn.classList.add("active-launcher");
+        });
+    }
+
+    function repairTimelineWindow() {
+        const win = document.getElementById("win-timeline");
+        if (!win) return;
+
+        win.style.display = "flex";
+        win.style.visibility = "visible";
+        win.classList.remove("minimized-window");
+        const minBtn = win.querySelector(".win-minimize");
+        if (minBtn) minBtn.innerHTML = "&#8722;";
+
+        const header = win.querySelector(".window-tabs-header");
+        const content = win.querySelector(".window-content");
+        if (!header || !content) return;
+
+        TIMELINE_TAB_IDS.forEach((tabId) => {
+            const tabBtn = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
+            const tabPanel = document.getElementById(tabId);
+            if (tabBtn && !header.contains(tabBtn)) header.appendChild(tabBtn);
+            if (tabPanel && !content.contains(tabPanel)) content.appendChild(tabPanel);
+        });
+
+        const seqBtn = header.querySelector('.tab-btn[data-tab="tab-timeline-content"]');
+        if (seqBtn) header.insertBefore(seqBtn, header.firstChild);
+
+        let activeTab = header.querySelector(".tab-btn.active");
+        if (!activeTab || !TIMELINE_TAB_IDS.includes(activeTab.getAttribute("data-tab"))) {
+            activeTab = seqBtn || header.querySelector(".tab-btn");
+        }
+        if (activeTab) activateTabInWindow(activeTab, win);
+
+        const seqPanel = document.getElementById("tab-timeline-content");
+        if (seqPanel) {
+            seqPanel.classList.add("active-content");
+            seqPanel.style.display = "";
+        }
+    }
+
+    function forceTimelineLayout() {
+        applyTimelineDockLayout(null, { rebuildFrames: true });
+        const launcherBtn = document.querySelector('.launcher-btn[data-target="win-timeline"]');
+        if (launcherBtn) launcherBtn.classList.add("active-launcher");
     }
 
     function syncAnimatedReferenceToAllFrames(layerId, gifFrames, meta) {
         if (!layerId || !gifFrames || !gifFrames.length) return;
+
+        if (gifFrames.length > state.frames.length) {
+            const framesToAdd = gifFrames.length - state.frames.length;
+            const lastFrame = state.frames[state.frames.length - 1];
+            for (let i = 0; i < framesToAdd; i++) {
+                const clonedLayers = lastFrame.layers.map(l => {
+                    const imgCopy = l.img ? new Image() : null;
+                    if (imgCopy) imgCopy.src = l.img.src;
+                    
+                    let drawCopy = null;
+                    if (l.drawingCanvas) {
+                        drawCopy = createDrawingCanvasForLayer(l.w, l.h);
+                        drawCopy.getContext("2d").drawImage(l.drawingCanvas, 0, 0);
+                    }
+
+                    return {
+                        ...l,
+                        id: l.isReference ? l.id : generateId(),
+                        img: imgCopy,
+                        drawingCanvas: drawCopy,
+                        keyframes: l.keyframes ? JSON.parse(JSON.stringify(l.keyframes)) : {},
+                        transparencyRules: l.transparencyRules ? l.transparencyRules.map(r => ({ ...r })) : []
+                    };
+                });
+                state.frames.push({
+                    id: generateId(),
+                    delay: lastFrame.delay || 100,
+                    layers: clonedLayers
+                });
+            }
+        }
 
         state.frames.forEach(frame => {
             const tl = frame.layers.find(l => l.id === layerId);
@@ -866,6 +1543,7 @@ document.addEventListener("DOMContentLoaded", () => {
         requestRender();
         updateLayersListUI();
         updateXYZControlsUI();
+        buildTimelineUI();
     }
 
     // Propaga le modifiche geometriche ed estetiche ai livelli corrispondenti negli altri fotogrammi
@@ -902,6 +1580,10 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
                     if (key === "gifFrames" && Array.isArray(value)) {
                         targetLayer[key] = cloneGifFrameCanvases(value);
+                    } else if (key === "keyframes" && value && typeof value === "object") {
+                        targetLayer[key] = JSON.parse(JSON.stringify(value));
+                    } else if (key === "transparencyRules" && Array.isArray(value)) {
+                        targetLayer[key] = value.map(r => ({ ...r }));
                     } else if (key === "img" && value && value.src) {
                         const imgCopy = new Image();
                         imgCopy.src = value.src;
@@ -984,6 +1666,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 savedCanvas.width = gifWidth;
                 savedCanvas.height = gifHeight;
                 savedCanvas.getContext("2d").drawImage(tempCanvas, 0, 0);
+                savedCanvas.gifFrameIndex = idx;
 
                 layer.gifFrames.push(savedCanvas);
             });
@@ -1024,7 +1707,8 @@ document.addEventListener("DOMContentLoaded", () => {
         state.undoStack.push({
             frames: cloneFrames(state.frames),
             activeFrameIndex: state.activeFrameIndex,
-            activeLayerId: state.activeLayerId
+            activeLayerId: state.activeLayerId,
+            colorReplacements: JSON.parse(JSON.stringify(state.colorReplacements || []))
         });
         if (state.undoStack.length > 40) {
             state.undoStack.shift();
@@ -1054,13 +1738,15 @@ document.addEventListener("DOMContentLoaded", () => {
         state.redoStack.push({
             frames: cloneFrames(state.frames),
             activeFrameIndex: state.activeFrameIndex,
-            activeLayerId: state.activeLayerId
+            activeLayerId: state.activeLayerId,
+            colorReplacements: JSON.parse(JSON.stringify(state.colorReplacements || []))
         });
 
         const prevState = state.undoStack.pop();
         state.frames = prevState.frames;
         state.activeFrameIndex = prevState.activeFrameIndex;
         state.activeLayerId = prevState.activeLayerId;
+        state.colorReplacements = prevState.colorReplacements || [];
 
         filterCache.clear();
         updateUndoRedoButtons();
@@ -1078,13 +1764,15 @@ document.addEventListener("DOMContentLoaded", () => {
         state.undoStack.push({
             frames: cloneFrames(state.frames),
             activeFrameIndex: state.activeFrameIndex,
-            activeLayerId: state.activeLayerId
+            activeLayerId: state.activeLayerId,
+            colorReplacements: JSON.parse(JSON.stringify(state.colorReplacements || []))
         });
 
         const nextState = state.redoStack.pop();
         state.frames = nextState.frames;
         state.activeFrameIndex = nextState.activeFrameIndex;
         state.activeLayerId = nextState.activeLayerId;
+        state.colorReplacements = nextState.colorReplacements || [];
 
         filterCache.clear();
         updateUndoRedoButtons();
@@ -1245,7 +1933,6 @@ document.addEventListener("DOMContentLoaded", () => {
             y = Math.max(10, Math.min(y, window.innerHeight - 340));
 
             const newWin = createNewFloatingWindow(x, y, tabBtn, tabContent);
-            if (newWin) activateTabInWindow(tabBtn, newWin);
 
             if (sourceWin && sourceWin.classList.contains("floating-window")) {
                 const remainingTabs = sourceWin.querySelectorAll(".tab-btn");
@@ -1437,6 +2124,131 @@ document.addEventListener("DOMContentLoaded", () => {
         return win;
     }
 
+    function applyTransparencyRuleToImageData(data, width, height, rule) {
+        const targetRgb = hexToRgb(rule.color || "#ffffff");
+        const maxDist = (rule.tolerance !== undefined ? rule.tolerance : 20) * 1.73205;
+
+        // Se il tipo è 'global' (Intero Livello), esegui la rimozione selettiva globale pixel-by-pixel
+        if (rule.type === "global") {
+            for (let i = 0; i < data.length; i += 4) {
+                if (data[i + 3] === 0) continue;
+                const dr = data[i] - targetRgb.r;
+                const dg = data[i + 1] - targetRgb.g;
+                const db = data[i + 2] - targetRgb.b;
+                if (Math.sqrt(dr * dr + dg * dg + db * db) <= maxDist) {
+                    data[i + 3] = 0; // Trasparente
+                }
+            }
+            return;
+        }
+
+        // Altrimenti esegui il Flood Fill connesso ('flood' o default)
+        if (rule.seedX == null || rule.seedY == null || rule.seedX === undefined) return;
+
+        const visited = new Uint8Array(width * height);
+        const queue = [];
+        const startX = Math.round(rule.seedX);
+        const startY = Math.round(rule.seedY);
+
+        function matchesColor(idx) {
+            if (data[idx + 3] === 0) return false;
+            const dr = data[idx] - targetRgb.r;
+            const dg = data[idx + 1] - targetRgb.g;
+            const db = data[idx + 2] - targetRgb.b;
+            return Math.sqrt(dr * dr + dg * dg + db * db) <= maxDist;
+        }
+
+        if (startX >= 0 && startX < width && startY >= 0 && startY < height) {
+            const startPos = startY * width + startX;
+            const idx = startPos * 4;
+            if (matchesColor(idx)) {
+                visited[startPos] = 1;
+                queue.push(startPos);
+                data[idx + 3] = 0;
+            }
+        }
+
+        let head = 0;
+        const dx = [-1, 1, 0, 0];
+        const dy = [0, 0, -1, 1];
+        while (head < queue.length) {
+            const pos = queue[head++];
+            const currX = pos % width;
+            const currY = Math.floor(pos / width);
+            for (let d = 0; d < 4; d++) {
+                const nx = currX + dx[d];
+                const ny = currY + dy[d];
+                if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                    const nPos = ny * width + nx;
+                    if (!visited[nPos]) {
+                        const nIdx = nPos * 4;
+                        if (matchesColor(nIdx)) {
+                            visited[nPos] = 1;
+                            data[nIdx + 3] = 0;
+                            queue.push(nPos);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    function updateTransparencyRulesUI() {
+        if (!dom.transparencyRulesListBox) return;
+        const layer = getActiveLayer();
+        dom.transparencyRulesListBox.innerHTML = "";
+        updateTransparentPickStatus();
+
+        if (!layer || layer.isReference || layer.locked) {
+            clearTransparentPickStatus();
+            dom.transparencyRulesListBox.innerHTML = `<div class="layer-warning">Seleziona un livello immagine modificabile.</div>`;
+            return;
+        }
+
+        ensureLayerTransparencyRules(layer);
+        if (!layer.transparencyRules.length) {
+            dom.transparencyRulesListBox.innerHTML = `<div class="layer-warning">Nessuna regola trasparenza su questo livello.</div>`;
+            return;
+        }
+
+        layer.transparencyRules.forEach((rule, idx) => {
+            const item = document.createElement("div");
+            item.className = "replacement-item transparency-rule-item";
+            const swatch = `<span class="replacement-color-swatch" style="background-color:${rule.color};" title="${rule.color}"></span>`;
+            
+            // Badge premium per il tipo di trasparenza
+            const typeLabel = rule.type === "global" ? "Intero Livello" : "Area Unita";
+            const typeBadge = `<span class="replacement-tolerance ui-field-label" style="background:rgba(255,255,255,0.1); border-radius:4px; padding:2px 6px; margin-right:4px;">${typeLabel}</span>`;
+            
+            item.innerHTML = `
+                <div class="replacement-colors">${swatch} <span class="replacement-color-arrow">&rarr;</span> <span class="ui-inline-label">trasparente</span></div>
+                <div class="replacement-details">
+                    ${typeBadge}
+                    <span class="replacement-tolerance">Toll: ${rule.tolerance}</span>
+                    <span class="ui-inline-label" style="opacity:0.85;">@${Math.round(rule.seedX)},${Math.round(rule.seedY)}</span>
+                </div>
+                <button type="button" class="replacement-btn-delete" data-index="${idx}" title="Elimina regola">
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+                </button>
+            `;
+            item.querySelector(".replacement-btn-delete").addEventListener("click", () => {
+                saveState();
+                layer.transparencyRules.splice(idx, 1);
+                
+                // Se lo scope è globale propaghiamo l'eliminazione a tutti i frame
+                if (state.editScope === "global") {
+                    propagateLayerTransparencyRules(layer);
+                } else {
+                    filterCache.delete(layer.id);
+                }
+                
+                updateTransparencyRulesUI();
+                requestRender();
+            });
+            dom.transparencyRulesListBox.appendChild(item);
+        });
+    }
+
     function updateReplacementsUI() {
             if (!dom.replacementsListBox) return;
             
@@ -1503,6 +2315,9 @@ document.addEventListener("DOMContentLoaded", () => {
         
         const btn = win.querySelector(".win-minimize");
         if (btn) btn.innerHTML = isMin ? "&#43;" : "&#8722;";
+        if (winId === "win-timeline" && !isMin) {
+            setTimeout(() => clampWindowToViewport(win), 0);
+        }
         saveLayoutToLocalStorage();
     }
 
@@ -1546,21 +2361,16 @@ document.addEventListener("DOMContentLoaded", () => {
                 let startTop = parseInt(win.style.top) || 0;
 
                 function onMouseMove(moveEvent) {
-                    let deltaX = moveEvent.clientX - startX;
-                    let deltaY = moveEvent.clientY - startY;
-                    
-                    let newLeft = startLeft + deltaX;
-                    let newTop = startTop + deltaY;
+                    const deltaX = moveEvent.clientX - startX;
+                    const deltaY = moveEvent.clientY - startY;
+                    const pos = clampDragPosition(win, startLeft + deltaX, startTop + deltaY);
 
-                    newTop = Math.max(48, Math.min(window.innerHeight - 40, newTop));
-                    newLeft = Math.max(-100, Math.min(window.innerWidth - 100, newLeft));
+                    win.style.left = `${pos.left}px`;
+                    win.style.top = `${pos.top}px`;
 
-                    win.style.left = newLeft + "px";
-                    win.style.top = newTop + "px";
-                    
                     if (state.windows[winId]) {
-                        state.windows[winId].left = newLeft;
-                        state.windows[winId].top = newTop;
+                        state.windows[winId].left = pos.left;
+                        state.windows[winId].top = pos.top;
                     }
                 }
 
@@ -1568,6 +2378,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     win.classList.remove("dragging");
                     document.removeEventListener("mousemove", onMouseMove);
                     document.removeEventListener("mouseup", onMouseUp);
+                    clampWindowToViewport(win);
                     saveLayoutToLocalStorage();
                 }
 
@@ -1617,10 +2428,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
                     win.style.width = newW + "px";
                     win.style.height = newH + "px";
-                    
+
                     if (isLeft) win.style.left = (startLeft + deltaX) + "px";
                     if (isTop) win.style.top = (startTop + deltaY) + "px";
-                    
+
                     if (state.windows[winId]) {
                         state.windows[winId].width = newW;
                         state.windows[winId].height = newH;
@@ -1633,7 +2444,11 @@ document.addEventListener("DOMContentLoaded", () => {
                     win.classList.remove("resizing");
                     document.removeEventListener("mousemove", onMouseMove);
                     document.removeEventListener("mouseup", onMouseUp);
+                    clampWindowToViewport(win);
                     saveLayoutToLocalStorage();
+                    if (win.id === "win-canvas") {
+                        setTimeout(centerCanvas, 30);
+                    }
                 }
 
                 document.addEventListener("mousemove", onMouseMove);
@@ -1656,11 +2471,10 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
     const windowIconsMap = {
-        "win-project": `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M12 18v-6M9 15l3 3 3-3"/></svg>`,
-        "win-tools": `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`,
-        "win-canvas": `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg>`,
-        "win-properties": `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12"/></svg>`,
-        "win-timeline": `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/></svg>`
+        "win-project": `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h6l2 2h10v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/><path d="M3 7V5a2 2 0 0 1 2-2h4l2 2"/></svg>`,
+        "win-canvas": `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 4v16M16 4v16M4 8h16M4 16h16"/></svg>`,
+        "win-properties": `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M2 14h4"/><path d="M10 8h4"/><path d="M18 16h4"/></svg>`,
+        "win-timeline": `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 4v16"/><path d="M16 4v16"/><path d="M3 10h18"/></svg>`
     };
 
     window.updateDynamicUI = function() {
@@ -1674,7 +2488,7 @@ document.addEventListener("DOMContentLoaded", () => {
             
             if (tabs.length > 0) {
                 const firstOrigin = tabs[0].getAttribute("data-origin-win");
-                const svgIcon = windowIconsMap[firstOrigin] || windowIconsMap["win-tools"];
+                const svgIcon = windowIconsMap[firstOrigin] || windowIconsMap["win-properties"];
                 
                 if (titleSpan && !titleSpan.querySelector("input")) {
                     const existingIcon = titleSpan.querySelector(".win-title-icon");
@@ -1716,33 +2530,106 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     };
 
-        dom.btnResetLayout.addEventListener("click", () => {
-            // Sposta TUTTI i tab nelle loro cartelle originali (se non ci sono già)
+        dom.btnDefaultLayout.addEventListener("click", () => {
+            // 1. Pulisce la memoria locale
+            localStorage.removeItem("gifstudio_tab_layout_v1");
+            localStorage.removeItem(LAYOUT_STORAGE_KEY);
+            localStorage.removeItem(LAYOUT_SCREEN_KEY);
+            
+            // 2. Riassegna tutti i tab alle loro finestre di default a "caldo"
             document.querySelectorAll(".tab-btn").forEach(tab => {
-                const originWinId = tab.getAttribute("data-origin-win");
-                if (originWinId) {
-                    const originWin = document.getElementById(originWinId);
-                    const tabContent = document.getElementById(tab.getAttribute("data-tab"));
-                    if (originWin && tabContent && !originWin.contains(tab)) {
-                        const originHeader = originWin.querySelector(".window-tabs-header");
-                        const originContent = originWin.querySelector(".window-content");
-                        if (originHeader && originContent) {
-                            originHeader.appendChild(tab);
-                            originContent.appendChild(tabContent);
-                        }
+                const tabId = tab.getAttribute("data-tab");
+                const desiredOrigin = TAB_DEFAULT_ORIGINS[tabId];
+                if (!desiredOrigin) return;
+                
+                tab.setAttribute("data-origin-win", desiredOrigin);
+                const originWin = document.getElementById(desiredOrigin);
+                const tabContent = document.getElementById(tabId);
+                
+                if (originWin && tabContent) {
+                    const originHeader = originWin.querySelector(".window-tabs-header");
+                    const originContent = originWin.querySelector(".window-content");
+                    
+                    if (originHeader && originContent) {
+                        tab.classList.remove("active");
+                        tabContent.classList.remove("active-content");
+                        originHeader.appendChild(tab);
+                        originContent.appendChild(tabContent);
                     }
                 }
             });
-            // Elimina tutte le finestre fluttuanti
+
+            // 3. Riattiva correttamente il primo tab di ogni finestra
+            document.querySelectorAll(".window").forEach(win => {
+                const tabs = win.querySelectorAll(".tab-btn");
+                if (tabs.length > 0) {
+                    const firstTab = tabs[0];
+                    firstTab.classList.add("active");
+                    const firstContent = document.getElementById(firstTab.getAttribute("data-tab"));
+                    if (firstContent) {
+                        firstContent.classList.add("active-content");
+                    }
+                }
+            });
+
+            // 4. Elimina finestre fluttuanti (se esistono)
             document.querySelectorAll(".window.floating-window").forEach(win => {
                 win.remove();
             });
-            arrangeWindowsDefault();
+
+            // 5. Algoritmo Posizione di Default (Estetica e grandezze forzate matematicamente)
+            const ws = getWorkspaceMetrics();
+            const gap = ws.gap;
+            const projectW = 400;
+            const propsW = 680;
+            
+            const fullH = ws.h - gap * 2;
+            const timelineH = Math.max(200, Math.min(320, Math.round(fullH * 0.32)));
+            const topH = fullH - timelineH - gap;
+
+            const projectX = gap;
+            const canvasX = projectX + projectW + gap;
+            const propsX = ws.w - propsW - gap;
+            const canvasW = Math.max(400, propsX - canvasX - gap);
+            
+            const timelineX = gap;
+            const timelineW = canvasX + canvasW - gap; // Si ferma ESATTAMENTE al gap prima delle proprieta
+
+            const defaultLayout = {
+                "win-project": { top: gap, left: projectX, width: projectW, height: topH },
+                "win-canvas": { top: gap, left: canvasX, width: canvasW, height: topH },
+                "win-properties": { top: gap, left: propsX, width: propsW, height: fullH },
+                "win-timeline": { top: gap + topH + gap, left: timelineX, width: timelineW, height: timelineH }
+            };
+
+            for (const [id, val] of Object.entries(defaultLayout)) {
+                const win = document.getElementById(id);
+                if (!win) continue;
+                
+                win.style.display = "flex";
+                win.style.visibility = "visible";
+                win.classList.remove("minimized-window");
+                win.style.top = val.top + "px";
+                win.style.left = val.left + "px";
+                win.style.width = val.width + "px";
+                win.style.height = val.height + "px";
+                
+                const minBtn = win.querySelector(".win-minimize");
+                if (minBtn) minBtn.innerHTML = "&#8722;";
+                
+                const launcherBtn = document.querySelector(`.launcher-btn[data-target="${id}"]`);
+                if (launcherBtn) launcherBtn.classList.add("active-launcher");
+            }
+            
+            ensureCoreWindowsVisible();
             setupTabHandlers();
+            
             if (typeof window.updateDynamicUI === "function") window.updateDynamicUI();
             layoutRestoreComplete = true;
             lastKnownScreen = { w: window.innerWidth, h: window.innerHeight };
+            
             saveLayoutToLocalStorage();
+            setTimeout(centerCanvas, 150);
         });
     }
 
@@ -1753,65 +2640,21 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!prevW || !prevH || !currentW || !currentH) return;
         if (!force && prevW === currentW && prevH === currentH) return;
 
-        const gap = 12;
-        const topBarH = 48;
-        const requiredIds = ["win-project", "win-tools", "win-properties", "win-canvas", "win-timeline"];
+        const ws = getWorkspaceMetrics();
+        const gap = ws.gap;
+        const requiredIds = ["win-project", "win-properties", "win-canvas", "win-timeline"];
+
+        const defLayout = computeDefaultWindowLayout(ws);
 
         requiredIds.forEach(id => {
             const win = document.getElementById(id);
             if (!win) return;
 
-            let left = parseInt(win.style.left) || 0;
-            let top = parseInt(win.style.top) || 0;
-            let width = parseInt(win.style.width) || win.offsetWidth;
-            let height = parseInt(win.style.height) || win.offsetHeight;
-
-            // 1. Adatta la coordinata X (left) e larghezza (width)
-            if (id === "win-project") {
-                left = gap;
-                width = (win && parseInt(win.style.width)) || 300;
-            } else if (id === "win-tools") {
-                const projectWin = document.getElementById("win-project");
-                const projectW = (projectWin && parseInt(projectWin.style.width)) || 300;
-                left = gap + projectW + gap;
-                width = (win && parseInt(win.style.width)) || 300;
-            } else if (id === "win-properties") {
-                width = (win && parseInt(win.style.width)) || 320;
-                left = currentW - width - gap;
-            } else if (id === "win-canvas" || id === "win-timeline") {
-                const projectWin = document.getElementById("win-project");
-                const projectW = (projectWin && parseInt(projectWin.style.width)) || 300;
-                const toolsWin = document.getElementById("win-tools");
-                const toolsW = (toolsWin && parseInt(toolsWin.style.width)) || 300;
-                const leftCanvas = gap + projectW + gap + toolsW + gap;
-                
-                left = leftCanvas;
-                const propertiesWin = document.getElementById("win-properties");
-                const propertiesW = (propertiesWin && parseInt(propertiesWin.style.width)) || 320;
-                width = Math.max(400, currentW - leftCanvas - propertiesW - gap * 2);
-            } else {
-                left = Math.round(left * (currentW / prevW));
-                width = Math.round(width * (currentW / prevW));
-            }
-
-            // 2. Adatta la coordinata Y (top) e l'altezza (height)
-            if (id === "win-project" || id === "win-tools" || id === "win-properties") {
-                top = topBarH + gap;
-                height = Math.max(500, currentH - topBarH - gap - 80);
-            } else if (id === "win-canvas") {
-                top = topBarH + gap;
-                const timelineWin = document.getElementById("win-timeline");
-                const timelineH = (timelineWin && parseInt(timelineWin.style.height)) || 170;
-                height = Math.max(300, currentH - topBarH - timelineH - gap * 3 - 80);
-            } else if (id === "win-timeline") {
-                const canvasWin = document.getElementById("win-canvas");
-                const canvasH = (canvasWin && parseInt(canvasWin.style.height)) || 300;
-                top = topBarH + gap + canvasH + gap;
-                height = (win && parseInt(win.style.height)) || 170;
-            } else {
-                top = Math.round(top * (currentH / prevH));
-                height = Math.round(height * (currentH / prevH));
-            }
+            const def = defLayout[id];
+            let left = def ? def.left : Math.round((parseInt(win.style.left) || 0) * (currentW / prevW));
+            let top = def ? def.top : Math.round((parseInt(win.style.top) || 0) * (ws.h / prevH));
+            let width = def ? def.width : Math.round((parseInt(win.style.width) || win.offsetWidth) * (currentW / prevW));
+            let height = def ? def.height : Math.round((parseInt(win.style.height) || win.offsetHeight) * (ws.h / prevH));
 
             // Applica stili
             win.style.left = left + "px";
@@ -1847,78 +2690,66 @@ document.addEventListener("DOMContentLoaded", () => {
                 };
             }
         }
-        localStorage.setItem("gifstudio_layout_v5", JSON.stringify(layoutData));
-        localStorage.setItem("gifstudio_layout_v5_screen", JSON.stringify({ w: currentW, h: currentH }));
+        localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(layoutData));
+        localStorage.setItem(LAYOUT_SCREEN_KEY, JSON.stringify({ w: ws.w, h: ws.h }));
     }
 
-    function arrangeWindowsDefault() {
-        const screenW = window.innerWidth;
-        const screenH = window.innerHeight;
+    /** Layout predefinito: 4 finestre (progetto / tavola / proprietà / timeline). */
+    function computeDefaultWindowLayout(ws) {
+        const gap = ws.gap;
+        const fullH = Math.max(240, ws.h - gap * 2);
 
-        const topBarH = 48;
-        const gap = 12;
+        let timelineH = Math.round(fullH * 0.32);
+        timelineH = Math.max(200, Math.min(320, timelineH));
+        let topSectionH = fullH - timelineH - gap;
 
-        // Columns:
-        // Col 1 (Project): Width 300px
-        const colProject_W = 300;
-        // Col 2 (Tools): Width 300px
-        const colTools_W = 300;
-        // Col 4 (Properties): Width 320px
-        const colProperties_W = 320;
-        
-        // Calculated height for sidebars (leaves ~80px for dock and margins)
-        const sidebarH = Math.max(500, screenH - topBarH - gap - 80);
+        const colProject_W = Math.max(340, Math.min(480, 400));
+        const colProperties_W = Math.max(500, Math.min(800, 680));
+        const left_canvas = gap + colProject_W + gap;
+        const right_props = ws.w - colProperties_W - gap;
+        const canvas_W = Math.max(400, right_props - left_canvas - gap);
+        const timeline_W = ws.w - colProperties_W - gap * 3;
 
-        // Calcola dinamicamente la larghezza del canvas centrale
-        const left_canvas = gap + colProject_W + gap + colTools_W + gap; // 636px
-        const canvas_W = Math.max(400, screenW - left_canvas - colProperties_W - gap * 2);
-        
-        // Altezze per canvas centrale e timeline
-        const timelineH = 170;
-        const canvasH = Math.max(300, screenH - topBarH - timelineH - gap * 3 - 80);
-
-        const defaults = {
+        return {
             "win-project": {
-                top: topBarH + gap,
+                top: gap,
                 left: gap,
                 width: colProject_W,
-                height: sidebarH,
-                visible: true,
-                isMinimized: false
-            },
-            "win-tools": {
-                top: topBarH + gap,
-                left: gap + colProject_W + gap,
-                width: colTools_W,
-                height: sidebarH,
+                height: topSectionH,
                 visible: true,
                 isMinimized: false
             },
             "win-properties": {
-                top: topBarH + gap,
-                left: screenW - colProperties_W - gap,
+                top: gap,
+                left: right_props,
                 width: colProperties_W,
-                height: sidebarH,
+                height: fullH,
                 visible: true,
                 isMinimized: false
             },
             "win-canvas": {
-                top: topBarH + gap,
+                top: gap,
                 left: left_canvas,
                 width: canvas_W,
-                height: canvasH,
+                height: topSectionH,
                 visible: true,
                 isMinimized: false
             },
             "win-timeline": {
-                top: topBarH + gap + canvasH + gap,
-                left: left_canvas,
-                width: canvas_W,
+                top: gap + topSectionH + gap,
+                left: gap,
+                width: timeline_W,
                 height: timelineH,
                 visible: true,
                 isMinimized: false
             }
         };
+    }
+
+    function arrangeWindowsDefault() {
+        const ws = getWorkspaceMetrics();
+        applyDefaultTabLayout();
+        const defaults = computeDefaultWindowLayout(ws);
 
         for (const [id, val] of Object.entries(defaults)) {
             const win = document.getElementById(id);
@@ -1929,16 +2760,16 @@ document.addEventListener("DOMContentLoaded", () => {
                 win.style.height = val.height + "px";
                 win.style.display = val.visible ? "flex" : "none";
                 win.classList.remove("minimized-window");
-                
+                clampWindowToViewport(win);
+
                 const minBtn = win.querySelector(".win-minimize");
                 if (minBtn) minBtn.innerHTML = "&#8722;";
-                
+
                 const btn = document.querySelector(`.launcher-btn[data-target="${id}"]`);
                 if (btn) {
                     btn.classList.toggle("active-launcher", val.visible);
                 }
 
-                // Memorizza nello stato
                 state.windows[id] = {
                     top: val.top,
                     left: val.left,
@@ -1950,7 +2781,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 };
             }
         }
+        repairTimelineWindow();
         saveLayoutToLocalStorage();
+        setTimeout(centerCanvas, 30);
     }
 
     // ======================================================================
@@ -1961,7 +2794,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function loadLayoutFromLocalStorage() {
-        const saved = localStorage.getItem("gifstudio_layout_v5");
+        const saved = localStorage.getItem(LAYOUT_STORAGE_KEY);
         if (!saved) {
             arrangeWindowsDefault();
             return;
@@ -1969,7 +2802,7 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             const layoutData = JSON.parse(saved);
             let screen = null;
-            const savedScreenStr = localStorage.getItem("gifstudio_layout_v5_screen");
+            const savedScreenStr = localStorage.getItem(LAYOUT_SCREEN_KEY);
             if (savedScreenStr) {
                 screen = JSON.parse(savedScreenStr);
             }
@@ -2007,6 +2840,16 @@ document.addEventListener("DOMContentLoaded", () => {
             e.currentTarget.classList.toggle("active", state.gridActive);
             requestRender();
         });
+
+        const winCanvas = document.getElementById("win-canvas");
+        if (winCanvas && typeof ResizeObserver !== "undefined") {
+            let t = null;
+            const ro = new ResizeObserver(() => {
+                clearTimeout(t);
+                t = setTimeout(() => centerCanvas(), 60);
+            });
+            ro.observe(winCanvas);
+        }
     }
 
     function applyWorkspaceDimensions(w, h) {
@@ -2035,10 +2878,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function centerCanvas() {
         const container = dom.scrollContainer;
-        const viewport = dom.canvasViewport;
-        if (container && viewport) {
-            container.scrollLeft = (viewport.scrollWidth - container.clientWidth) / 2;
-            container.scrollTop = (viewport.scrollHeight - container.clientHeight) / 2;
+        const target = document.getElementById("canvas-border-shadow") || dom.mainCanvas;
+        
+        if (!container || !target) return;
+        
+        // Ottieni i rettangoli dei contenitori con refresh delle metriche
+        const containerW = container.clientWidth || 600;
+        const containerH = container.clientHeight || 400;
+        const scrollW = container.scrollWidth;
+        const scrollH = container.scrollHeight;
+        
+        // Calcola i centri rispetto al viewport dinamicamente
+        const scrollLeftTarget = Math.max(0, (scrollW - containerW) / 2);
+        const scrollTopTarget = Math.max(0, (scrollH - containerH) / 2);
+        
+        // Applica lo scroll con easing dinamico
+        if (container.scrollLeft !== scrollLeftTarget) {
+            container.scrollLeft = scrollLeftTarget;
+        }
+        if (container.scrollTop !== scrollTopTarget) {
+            container.scrollTop = scrollTopTarget;
         }
     }
 
@@ -2068,6 +2927,10 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!frame) return;
 
         saveState(); // Salva lo stato per l'Undo prima di aggiungere il livello
+
+        if (!layerObj.groupId) {
+            layerObj.groupId = generateId();
+        }
 
         const maxZ = frame.layers.reduce((max, l) => Math.max(max, isNaN(l.z) ? 0 : (l.z || 0)), 0);
         layerObj.z = maxZ + 1;
@@ -2135,7 +2998,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (layer.type === "image" && layer.img) {
                 thumbContent = `<img src="${layer.img.src}" alt="preview">`;
             } else if (layer.type === "text") {
-                thumbContent = `<span style="font-weight:bold; font-size:10px;">Scritta</span>`;
+                thumbContent = `<span class="ui-field-label">Scritta</span>`;
             }
 
             li.innerHTML = `
@@ -2167,6 +3030,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 updateLayersListUI();
                 updateXYZControlsUI();
+                buildTimelineUI();
                 requestRender();
             });
 
@@ -2233,6 +3097,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if (dom.bgRemoveToleranceSlider) {
             dom.bgRemoveToleranceSlider.value = layer.bgRemoveTolerance !== undefined ? layer.bgRemoveTolerance : 20;
         }
+        ensureLayerTransparencyRules(layer);
+        clearTransparentPickStatus();
+        updateTransparencyRulesUI();
 
         // Disabilitazione intelligente dei tab Filtri e Colori per i livelli di Riferimento Bloccati
         const filtersTabs = document.querySelectorAll("#win-properties .window-tabs-header [data-tab='tab-prop-bg'], #win-properties .window-tabs-header [data-tab='tab-prop-colors']");
@@ -2391,8 +3258,26 @@ document.addEventListener("DOMContentLoaded", () => {
             propagateLayerChanges(layer, globalProps, true);
         }
 
+        syncCurrentFrameKeyframeFromLayer(layer);
         filterCache.delete(layer.id);
         requestRender();
+    }
+
+    function syncCurrentFrameKeyframeFromLayer(layer) {
+        if (!layer) return;
+        ensureLayerKeyframes(layer);
+        const fi = state.activeFrameIndex;
+        if (layer.keyframes[fi]) {
+            KEYFRAME_PROPS.forEach((prop) => {
+                if (layer.keyframes[fi][prop] !== undefined) {
+                    layer.keyframes[fi][prop] = layer[prop];
+                }
+            });
+            propagateLayerKeyframes(layer);
+            buildTimelineUI();
+        } else if (state.autoKeyframe) {
+            maybeAutoRecordKeyframe(layer);
+        }
     }
 
     // ======================================================================
@@ -2564,10 +3449,27 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function applyGlobalFilters(layer, sourceImg) {
-        const hasReplacements = state.colorReplacements && state.colorReplacements.length > 0;
+        const activeReplacements = (state.colorReplacements || []).filter(rep => {
+            if (rep.scope === "frame" && rep.targetLayerId && rep.targetLayerId !== layer.id) {
+                return false;
+            }
+            if (rep.scope === "global" && rep.targetLayerId) {
+                let sourceLayer = null;
+                for (const f of state.frames) {
+                    sourceLayer = f.layers.find(l => l.id === rep.targetLayerId);
+                    if (sourceLayer) break;
+                }
+                if (sourceLayer && !isHomologousLayer(layer, sourceLayer)) {
+                    return false;
+                }
+            }
+            return true;
+        });
+        const hasReplacements = activeReplacements.length > 0;
         const hasBgRemove = !!layer.bgRemoveActive;
+        const hasTransparencyRules = layer.transparencyRules && layer.transparencyRules.length > 0;
         
-        if (!hasReplacements && !hasBgRemove) {
+        if (!hasReplacements && !hasBgRemove && !hasTransparencyRules) {
             return sourceImg;
         }
 
@@ -2779,9 +3681,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             }
         }
-
-        const replacements = state.colorReplacements.map(rep => {
+        const replacements = activeReplacements.map(rep => {
             return {
+                type: rep.type,
                 fromRgb: hexToRgb(rep.from),
                 toRgb: hexToRgb(rep.to),
                 tolerance: rep.tolerance !== undefined ? rep.tolerance : 20,
@@ -2790,6 +3692,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 seedY: rep.seedY
             };
         });
+
+        if (hasTransparencyRules) {
+            layer.transparencyRules.forEach((rule) => {
+                applyTransparencyRuleToImageData(data, width, height, rule);
+            });
+        }
 
 
 
@@ -3151,8 +4059,11 @@ document.addEventListener("DOMContentLoaded", () => {
         if (dom.btnPickReplaceTo) {
             dom.btnPickReplaceTo.addEventListener("click", () => activatePipette("replace-to", dom.btnPickReplaceTo));
         }
-        if (dom.btnPickBgColor) {
-            dom.btnPickBgColor.addEventListener("click", () => activatePipette("bg-remove", dom.btnPickBgColor));
+        if (dom.btnPickTransparentColor) {
+            dom.btnPickTransparentColor.addEventListener("click", () => activatePipette("bg-transparent-pick", dom.btnPickTransparentColor));
+        }
+        if (dom.btnPickBgRemoveColor) {
+            dom.btnPickBgRemoveColor.addEventListener("click", () => activatePipette("bg-remove", dom.btnPickBgRemoveColor));
         }
 
         dom.mainCanvas.addEventListener("mousedown", startDrawing);
@@ -3208,8 +4119,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     layer.bgRemoveColor = hex;
                     layer.bgRemoveActive = true;
                     if (dom.bgRemoveActive) dom.bgRemoveActive.checked = true;
+                    state.lastPickedTransparencyCoords = { x: localCoords.x, y: localCoords.y };
                     
-                    // Propaga le modifiche se l'ambito è globale
                     propagateLayerChanges(layer, {
                         bgRemoveSeedX: layer.bgRemoveSeedX,
                         bgRemoveSeedY: layer.bgRemoveSeedY,
@@ -3218,6 +4129,13 @@ document.addEventListener("DOMContentLoaded", () => {
                     });
                     
                     filterCache.delete(layer.id);
+                }
+            } else if (state.colorPickerTarget === "bg-transparent-pick") {
+                if (dom.bgTransparentColor) dom.bgTransparentColor.value = hex;
+                if (layer) {
+                    const localCoords = mapGlobalToLayerCoords(coords.x, coords.y, layer);
+                    state.lastPickedTransparencyCoords = { x: localCoords.x, y: localCoords.y };
+                    updateTransparentPickStatus();
                 }
             } else if (state.colorPickerTarget === "chain-erase") {
                 const localCoords = mapGlobalToLayerCoords(coords.x, coords.y, layer);
@@ -3518,6 +4436,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         function onMouseUp() {
+            syncCurrentFrameKeyframeFromLayer(layer);
             document.removeEventListener("mousemove", onMouseMove);
             document.removeEventListener("mouseup", onMouseUp);
         }
@@ -3612,6 +4531,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                     const newLayer = {
                         id: generateId(),
+                        groupId: generateId(),
                         name: file.name.substring(0, 15),
                         type: "image",
                         x: isFirstImport ? 0 : Math.round((state.canvasWidth - img.width) / 2),
@@ -3627,7 +4547,9 @@ document.addEventListener("DOMContentLoaded", () => {
                         borderRadius: 0,
                         chromaActive: false,
                         chromaColor: "#ffffff",
-                        chromaTolerance: 20
+                        chromaTolerance: 20,
+                        transparencyRules: [],
+                        keyframes: {}
                     };
                     addLayer(newLayer);
                     // Ricalcola auto-zoom
@@ -3647,8 +4569,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 saveState();
                 
                 const sharedId = generateId();
+                const sharedGroupId = generateId();
                 const newLayer = {
                     id: sharedId,
+                    groupId: sharedGroupId,
                     name: "Rif: " + file.name.substring(0, 12),
                     type: "image",
                     x: 0,
@@ -3668,7 +4592,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     chromaColor: "#ffffff",
                     chromaTolerance: 20,
                     startFrame: 1,
-                    endFrame: state.frames.length
+                    endFrame: state.frames.length,
+                    transparencyRules: [],
+                    keyframes: {}
                 };
                 
                 // Aggiungiamo il livello di riferimento a tutti i fotogrammi del progetto
@@ -3695,8 +4621,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 img.onload = function() {
                     saveState(); // Salva lo stato prima di aggiungere il riferimento
                     const sharedId = generateId();
+                    const sharedGroupId = generateId();
                     const newLayer = {
                         id: sharedId,
+                        groupId: sharedGroupId,
                         name: "Rif: " + file.name.substring(0, 12),
                         type: "image",
                         x: Math.round((state.canvasWidth - img.width) / 2),
@@ -3716,7 +4644,9 @@ document.addEventListener("DOMContentLoaded", () => {
                         chromaColor: "#ffffff",
                         chromaTolerance: 20,
                         startFrame: 1,
-                        endFrame: state.frames.length
+                        endFrame: state.frames.length,
+                        transparencyRules: [],
+                        keyframes: {}
                     };
                     
                     // Aggiungiamo il livello di riferimento a tutti i fotogrammi del progetto
@@ -3786,6 +4716,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             const parsedFrames = [];
+            const sharedGroupId = generateId();
             
             const tempCanvas = document.createElement("canvas");
             const tempCtx = tempCanvas.getContext("2d");
@@ -3824,6 +4755,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     layers: [
                         {
                             id: generateId(),
+                            groupId: sharedGroupId,
                             name: `Fotogramma ${idx + 1}`,
                             type: "image",
                             x: 0,
@@ -3839,7 +4771,9 @@ document.addEventListener("DOMContentLoaded", () => {
                             borderRadius: 0,
                             chromaActive: false,
                             chromaColor: "#ffffff",
-                            chromaTolerance: 20
+                            chromaTolerance: 20,
+                            transparencyRules: [],
+                            keyframes: {}
                         }
                     ]
                 });
@@ -3847,6 +4781,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             state.frames = parsedFrames;
             state.activeFrameIndex = 0;
+            applyKeyframesForTimelineFrame(0);
             state.activeLayerId = state.frames[0].layers[0].id;
 
             buildTimelineUI();
@@ -4244,6 +5179,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     return;
                 }
 
+                applyKeyframesForTimelineFrame(frameIdx);
                 const frame = state.frames[frameIdx];
                 
                 const frameCanvas = document.createElement("canvas");
@@ -4544,18 +5480,29 @@ document.addEventListener("DOMContentLoaded", () => {
     // 15. SEQUENZA FRAME GIF (TIMELINE)
     // ======================================================================
     function buildTimelineUI() {
+        if (!dom.framesTrack) return;
         dom.framesTrack.innerHTML = "";
-        
+        if (dom.keyframesTrackBox) dom.keyframesTrackBox.innerHTML = "";
+
+        const targetType = dom.keyframeTarget ? dom.keyframeTarget.value : "active";
+        const kfLayer = resolveKeyframeTargetLayer(targetType);
+        const kfIndices = kfLayer ? getSortedKeyframeFrames(kfLayer) : [];
+
         state.frames.forEach((frame, idx) => {
+            const isCurrent = idx === state.activeFrameIndex;
+            ensureLayerKeyframes(kfLayer);
+            const hasKf = kfLayer && kfLayer.keyframes && kfLayer.keyframes[idx] !== undefined;
+
+            const frameCol = document.createElement("div");
+            frameCol.className = `timeline-frame-column ${isCurrent ? "active-column" : ""}`;
+            frameCol.dataset.index = idx;
+
             const card = document.createElement("div");
-            card.className = `frame-thumbnail-card ${idx === state.activeFrameIndex ? 'active-frame' : ''}`;
-            card.dataset.index = idx;
-            
+            card.className = `frame-thumbnail-card ${isCurrent ? "active-frame" : ""}${hasKf ? " has-keyframe" : ""}`;
             let imgHtml = "";
             if (frame.layers.length > 0 && frame.layers[0].img) {
                 imgHtml = `<img src="${frame.layers[0].img.src}" alt="preview">`;
             }
-
             card.innerHTML = `
                 <div class="frame-card-preview">${imgHtml}</div>
                 <div class="frame-card-footer">
@@ -4563,15 +5510,69 @@ document.addEventListener("DOMContentLoaded", () => {
                     <span>${frame.delay}ms</span>
                 </div>
             `;
+            card.addEventListener("click", () => selectFrame(idx));
+            frameCol.appendChild(card);
+            dom.framesTrack.appendChild(frameCol);
 
-            card.addEventListener("click", () => {
-                selectFrame(idx);
-            });
-            dom.framesTrack.appendChild(card);
+            if (dom.keyframesTrackBox) {
+                const betweenKf = kfIndices.some((k, i) => {
+                    const next = kfIndices[i + 1];
+                    return next !== undefined && k < idx && idx < next;
+                });
+                const kfCol = document.createElement("div");
+                kfCol.className = `timeline-kf-column ${isCurrent ? "active-column" : ""}${betweenKf ? " kf-bridge-active" : ""}`;
+                kfCol.dataset.index = idx;
+
+                const kfSlot = document.createElement("div");
+                kfSlot.className = "keyframe-slot";
+
+                const kfNode = document.createElement("div");
+                if (hasKf) {
+                    kfNode.className = "kf-diamond";
+                    kfNode.title = `Keyframe #${idx + 1} — ${kfLayer.name}. Clic: seleziona · Alt+Clic: rimuovi`;
+                } else {
+                    kfNode.className = "kf-dot";
+                    kfNode.title = `Frame #${idx + 1}. Clic: aggiungi keyframe`;
+                }
+
+                kfNode.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    if (!kfLayer) return;
+                    state.activeLayerId = kfLayer.id;
+                    updateLayersListUI();
+                    if (e.altKey && hasKf) {
+                        deleteKeyframeAtFrame(kfLayer, idx);
+                        selectFrame(idx);
+                    } else if (hasKf) {
+                        selectFrame(idx);
+                    } else {
+                        saveState();
+                        upsertKeyframeAtFrame(kfLayer, idx);
+                        selectFrame(idx);
+                        buildTimelineUI();
+                        requestRender();
+                    }
+                });
+
+                kfSlot.appendChild(kfNode);
+                kfCol.appendChild(kfSlot);
+                dom.keyframesTrackBox.appendChild(kfCol);
+            }
         });
 
+        if (dom.keyframesTrackBox && kfIndices.length >= 2) {
+            const cols = dom.keyframesTrackBox.querySelectorAll(".timeline-kf-column");
+            for (let i = 0; i < kfIndices.length - 1; i++) {
+                const a = kfIndices[i];
+                const b = kfIndices[i + 1];
+                for (let f = a + 1; f < b; f++) {
+                    if (cols[f]) cols[f].classList.add("kf-bridge-active");
+                }
+            }
+        }
+
         const currentFrame = getActiveFrame();
-        if (currentFrame) {
+        if (currentFrame && dom.timelineDelay) {
             dom.timelineDelay.value = currentFrame.delay;
         }
     }
@@ -4580,6 +5581,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (index < 0 || index >= state.frames.length) return;
         
         state.activeFrameIndex = index;
+        applyKeyframesForTimelineFrame(index);
         
         const frame = getActiveFrame();
         state.activeLayerId = frame.layers.length > 0 ? frame.layers[0].id : null;
@@ -4642,7 +5644,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     ...l,
                     id: generateId(),
                     img: imgCopy,
-                    drawingCanvas: drawCopy
+                    drawingCanvas: drawCopy,
+                    keyframes: l.keyframes ? JSON.parse(JSON.stringify(l.keyframes)) : {},
+                    transparencyRules: l.transparencyRules ? l.transparencyRules.map(r => ({ ...r })) : []
                 };
             });
 
@@ -4692,6 +5696,67 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             alert(`Ottimizzazione completata. Rimossi ${removedCount} fotogrammi doppi statici.`);
             selectFrame(0);
+        });
+
+        if (dom.btnAddKeyframe) {
+            dom.btnAddKeyframe.addEventListener("click", () => {
+                const targetType = dom.keyframeTarget ? dom.keyframeTarget.value : "active";
+                const layer = resolveKeyframeTargetLayer(targetType);
+                if (!layer) {
+                    alert("Nessun livello trovato per il target selezionato.");
+                    return;
+                }
+                state.activeLayerId = layer.id;
+                updateLayersListUI();
+                addKeyframeAtCurrentFrame(layer);
+                updateXYZControlsUI();
+            });
+        }
+
+        if (dom.btnDeleteKeyframe) {
+            dom.btnDeleteKeyframe.addEventListener("click", () => {
+                const targetType = dom.keyframeTarget ? dom.keyframeTarget.value : "active";
+                const layer = resolveKeyframeTargetLayer(targetType);
+                if (!layer) {
+                    alert("Nessun livello trovato per il target selezionato.");
+                    return;
+                }
+                deleteKeyframeAtCurrentFrame(layer);
+            });
+        }
+
+        if (dom.keyframeTarget) {
+            dom.keyframeTarget.addEventListener("change", () => {
+                buildTimelineUI();
+            });
+        }
+
+        if (dom.kfAutoKeyframe) {
+            dom.kfAutoKeyframe.checked = !!state.autoKeyframe;
+            dom.kfAutoKeyframe.addEventListener("change", (e) => {
+                state.autoKeyframe = e.target.checked;
+            });
+        }
+
+        if (dom.btnGotoPrevKeyframe) {
+            dom.btnGotoPrevKeyframe.addEventListener("click", () => gotoAdjacentKeyframe(-1));
+        }
+        if (dom.btnGotoNextKeyframe) {
+            dom.btnGotoNextKeyframe.addEventListener("click", () => gotoAdjacentKeyframe(1));
+        }
+
+        KEYFRAME_PROPS.forEach((prop) => {
+            const elId = "kf-prop-" + (prop === "opacity" ? "opacity" : prop);
+            const el = document.getElementById(elId);
+            if (el) {
+                el.addEventListener("change", () => {
+                    const layer = resolveKeyframeTargetLayer(dom.keyframeTarget ? dom.keyframeTarget.value : "active");
+                    if (layer && layer.keyframes[state.activeFrameIndex]) {
+                        syncCurrentFrameKeyframeFromLayer(layer);
+                        requestRender();
+                    }
+                });
+            }
         });
     }
 
@@ -4798,7 +5863,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function initFilterTools() {
-        // SINCRONIZZAZIONE TOLLERANZA (NUMERO <-> SLIDER) E AGGIORNAMENTO LIVE TRASPARENZA SFONDO
+        // Sincronizzazione tolleranza — trasparenza automatica (sfondo ai bordi)
         if (dom.bgRemoveTolerance && dom.bgRemoveToleranceSlider) {
             dom.bgRemoveToleranceSlider.addEventListener("input", (e) => {
                 const val = parseInt(e.target.value) || 0;
@@ -4845,17 +5910,44 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         }
 
-        // CAMBIAMENTO COLORE LIVE
+        // Colore live — solo trasparenza automatica
         if (dom.bgRemoveColor) {
             dom.bgRemoveColor.addEventListener("input", (e) => {
                 const layer = getActiveLayer();
                 if (layer) {
                     layer.bgRemoveColor = e.target.value;
                     propagateLayerChanges(layer, { bgRemoveColor: layer.bgRemoveColor });
-                    
                     filterCache.delete(layer.id);
                     requestRender();
                 }
+            });
+        }
+
+        // Sincronizzazione tolleranza — trasparenza a catena (anteprima regole)
+        function syncTransparentTolerance(val) {
+            val = Math.max(0, Math.min(255, val));
+            if (dom.bgTransparentTolerance) dom.bgTransparentTolerance.value = val;
+            if (dom.bgTransparentToleranceSlider) dom.bgTransparentToleranceSlider.value = val;
+            const layer = getActiveLayer();
+            if (layer && layer.transparencyRules && layer.transparencyRules.length) {
+                filterCache.delete(layer.id);
+                requestRender();
+            }
+        }
+        if (dom.bgTransparentTolerance && dom.bgTransparentToleranceSlider) {
+            dom.bgTransparentToleranceSlider.addEventListener("input", (e) => {
+                syncTransparentTolerance(parseInt(e.target.value, 10) || 0);
+            });
+            dom.bgTransparentTolerance.addEventListener("input", (e) => {
+                syncTransparentTolerance(parseInt(e.target.value, 10) || 0);
+            });
+        }
+        if (dom.bgTransparencyType) {
+            dom.bgTransparencyType.addEventListener("change", () => {
+                if (dom.bgTransparencyType.value === "global") {
+                    clearTransparentPickStatus();
+                }
+                updateTransparentPickStatus();
             });
         }
 
@@ -4870,19 +5962,22 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         }
 
-        dom.btnApplyCorners.addEventListener("click", () => {
-            const layer = getActiveLayer();
-            if (!layer) return;
+        if (dom.btnApplyCorners) {
+            dom.btnApplyCorners.addEventListener("click", () => {
+                const layer = getActiveLayer();
+                if (!layer) return;
 
-            layer.borderRadius = parseInt(dom.filterBorderRadius.value) || 0;
-            propagateLayerChanges(layer, { borderRadius: layer.borderRadius });
-            requestRender();
-        });
+                layer.borderRadius = parseInt(dom.filterBorderRadius.value) || 0;
+                propagateLayerChanges(layer, { borderRadius: layer.borderRadius });
+                requestRender();
+            });
+        }
 
-        dom.addTextLayer.addEventListener("click", () => {
+        if (dom.addTextLayer) dom.addTextLayer.addEventListener("click", () => {
             saveState(); // Salva lo stato prima di aggiungere
 
             const sharedId = generateId();
+            const sharedGroupId = generateId();
             const fontSize = Math.max(10, Math.min(32, Math.round(state.canvasHeight * 0.2)));
             const w = Math.max(50, Math.round(state.canvasWidth * 0.8));
             const h = Math.max(20, Math.round(fontSize * 1.5));
@@ -4892,6 +5987,7 @@ document.addEventListener("DOMContentLoaded", () => {
             state.frames.forEach((frame) => {
                 const textLayer = {
                     id: sharedId,
+                    groupId: sharedGroupId,
                     name: "Livello Scritta",
                     type: "text",
                     x: Math.round((state.canvasWidth - w) / 2),
@@ -4931,21 +6027,27 @@ document.addEventListener("DOMContentLoaded", () => {
         dom.btnAddReplacement.addEventListener("click", () => {
             saveState();
             const useGlobal = state.editScope === "global";
+            const layer = getActiveLayer();
             const rep = {
                 from: dom.replaceColorFrom.value,
                 to: dom.replaceColorTo.value,
                 tolerance: parseInt(dom.replaceColorTolerance.value) || 20,
                 transparent: false,
                 seedX: useGlobal ? null : (state.lastPickedReplaceCoords ? state.lastPickedReplaceCoords.x : null),
-                seedY: useGlobal ? null : (state.lastPickedReplaceCoords ? state.lastPickedReplaceCoords.y : null)
+                seedY: useGlobal ? null : (state.lastPickedReplaceCoords ? state.lastPickedReplaceCoords.y : null),
+                scope: state.editScope,
+                targetLayerId: layer ? layer.id : null
             };
             state.colorReplacements.push(rep);
             state.lastPickedReplaceCoords = null;
-            bakeColorReplacementToProject(rep);
             updateReplacementsUI();
             filterCache.clear();
             requestRender();
         });
+
+        if (dom.btnAddTransparencyRule) {
+            dom.btnAddTransparencyRule.addEventListener("click", () => addTransparencyRuleFromUI());
+        }
 
     }
 
@@ -5301,11 +6403,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 </div>
                 <div class="update-banner-text">
                     <div class="update-banner-title">Nuovo Aggiornamento Disponibile! (v${updateData.latestVersion})</div>
-                    <div class="update-banner-desc">È disponibile una versione più recente di Gif Studio. La tua versione attuale è v${updateData.currentVersion}.</div>
+                    <div class="update-banner-desc">Versione attuale v${updateData.currentVersion}. Lo scaricamento va in <b>Download</b> (non sostituisce l'exe in uso). Chiudi l'app e avvia il nuovo file.</div>
                 </div>
             </div>
             <div class="update-banner-actions">
-                <a href="${updateData.downloadUrl}" target="_blank" class="update-banner-btn-download" id="update-download-btn">Aggiorna</a>
+                <button type="button" class="update-banner-btn-download" id="update-download-btn">Scarica aggiornamento</button>
+                <button type="button" class="update-banner-btn-browser" id="update-browser-btn" title="Apri pagina release nel browser">Browser</button>
                 <button class="update-banner-btn-close" id="update-close-btn" title="Chiudi">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -5331,10 +6434,73 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             });
         });
+
+        const downloadBtn = banner.querySelector('#update-download-btn');
+        const browserBtn = banner.querySelector('#update-browser-btn');
+
+        async function runSafeUpdateDownload() {
+            if (!updateData.downloadUrl) {
+                alert('Link di download non disponibile.');
+                return;
+            }
+            const prevLabel = downloadBtn.textContent;
+            downloadBtn.disabled = true;
+            downloadBtn.textContent = 'Download in corso...';
+            try {
+                const params = new URLSearchParams({
+                    mode: 'download',
+                    downloadUrl: updateData.downloadUrl,
+                    version: updateData.latestVersion || 'latest'
+                });
+                const res = await fetch(`/api/open-update-download?${params.toString()}`);
+                const data = await res.json();
+                if (!res.ok || !data.ok) {
+                    throw new Error(data.error || 'Download non riuscito');
+                }
+                alert(
+                    `Aggiornamento scaricato in Download:\n\n${data.fileName}\n\n` +
+                    'Chiudi Gif Studio, poi avvia il nuovo file dalla cartella Download. ' +
+                    'Non sostituire l\'exe mentre l\'app è aperta.'
+                );
+            } catch (err) {
+                console.warn('Download diretto fallito, apertura browser:', err);
+                await openUpdateInExternalBrowser(updateData);
+            } finally {
+                downloadBtn.disabled = false;
+                downloadBtn.textContent = prevLabel;
+            }
+        }
+
+        async function openUpdateInExternalBrowser(update) {
+            const pageUrl = update.releasePageUrl || update.downloadUrl;
+            if (!pageUrl) {
+                alert('Pagina di aggiornamento non disponibile.');
+                return;
+            }
+            const params = new URLSearchParams({
+                mode: 'browser',
+                pageUrl
+            });
+            const res = await fetch(`/api/open-update-download?${params.toString()}`);
+            const data = await res.json();
+            if (!res.ok || !data.ok) {
+                alert('Impossibile aprire il browser per il download.');
+                return;
+            }
+            alert(
+                `Apertura in ${data.browser || 'browser'}.\n\n` +
+                'Scarica il file .exe nella cartella Download, chiudi Gif Studio e avvia il nuovo programma.'
+            );
+        }
+
+        downloadBtn.addEventListener('click', runSafeUpdateDownload);
+        browserBtn.addEventListener('click', () => openUpdateInExternalBrowser(updateData));
     }
 
     async function startApp() {
+        migrateLegacyLayoutStorage();
         initAllTabOrigins();
+        applyDefaultTabLayout();
         setupTabHandlers();
         initTabDockingSystem();
         setupWindowManager();
@@ -5358,9 +6524,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const finalizeLayoutRestore = () => {
             reapplyProportionalLayout();
+            repairTimelineWindow();
+            ensureCoreWindowsVisible();
+            document.querySelectorAll(".window").forEach(clampWindowToViewport);
             layoutRestoreComplete = true;
             lastKnownScreen = { w: window.innerWidth, h: window.innerHeight };
             if (typeof window.updateDynamicUI === "function") window.updateDynamicUI();
+            buildTimelineUI();
             setTimeout(centerCanvas, 30);
         };
 
@@ -5375,8 +6545,148 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         buildTimelineUI();
+        applyKeyframesForTimelineFrame(state.activeFrameIndex);
         updateReplacementsUI();
         checkForUpdates();
+
+        if (window.location.search.includes("test=true")) {
+            setTimeout(runAutomatedBetaTests, 1000);
+        }
+    }
+
+    function runAutomatedBetaTests() {
+        console.log("=== INIZIO BETA TEST AUTOMATIZZATI ===");
+        const results = {
+            timestamp: new Date().toISOString(),
+            success: true,
+            tests: []
+        };
+
+        function assert(condition, message) {
+            results.tests.push({
+                message: message,
+                status: condition ? "PASSED" : "FAILED"
+            });
+            if (!condition) {
+                results.success = false;
+                console.error("FAIL:", message);
+            } else {
+                console.log("PASS:", message);
+            }
+        }
+
+        try {
+            // Test 1: Sostituzione Colore Globale e Livelli Omologhi
+            console.log("Esecuzione Test 1: Sostituzione Colore Globale e Livelli Omologhi...");
+            
+            state.frames = [];
+            state.activeFrameIndex = 0;
+            state.colorReplacements = [];
+
+            const frame1Id = generateId();
+            const frame2Id = generateId();
+            const mainGroupId = generateId();
+            
+            const mainLayer1 = {
+                id: generateId(),
+                groupId: mainGroupId,
+                name: "Sfondo",
+                type: "image",
+                x: 0, y: 0, w: 100, h: 100,
+                transparencyRules: []
+            };
+
+            const mainLayer2 = {
+                id: generateId(),
+                groupId: mainGroupId,
+                name: "Sfondo",
+                type: "image",
+                x: 0, y: 0, w: 100, h: 100,
+                transparencyRules: []
+            };
+
+            state.frames = [
+                { id: frame1Id, delay: 100, layers: [mainLayer1] },
+                { id: frame2Id, delay: 100, layers: [mainLayer2] }
+            ];
+
+            assert(isHomologousLayer(mainLayer1, mainLayer2), "I due livelli principali con lo stesso groupId devono essere omologhi");
+
+            const textLayer = {
+                id: generateId(),
+                groupId: generateId(),
+                name: "Testo",
+                type: "text",
+                x: 0, y: 0, w: 50, h: 50
+            };
+            state.frames[0].layers.unshift(textLayer);
+
+            assert(isHomologousLayer(mainLayer1, mainLayer2), "I livelli principali devono rimanere omologhi anche se disallineati dall'inserimento di un altro livello");
+
+            // Test 2: Verifica getFilterCacheKey e gifFrameIndex per GIF di Riferimento
+            console.log("Esecuzione Test 2: Verifica getFilterCacheKey e gifFrameIndex...");
+            
+            const refLayer = {
+                id: generateId(),
+                groupId: generateId(),
+                name: "Riferimento Animato",
+                type: "image",
+                gifFrames: [
+                    document.createElement("canvas"),
+                    document.createElement("canvas")
+                ],
+                transparencyRules: []
+            };
+            refLayer.gifFrames[0].gifFrameIndex = 0;
+            refLayer.gifFrames[1].gifFrameIndex = 1;
+
+            const key1 = getFilterCacheKey(refLayer, refLayer.gifFrames[0]);
+            const key2 = getFilterCacheKey(refLayer, refLayer.gifFrames[1]);
+
+            assert(key1 !== key2, "Le chiavi della cache del filtro per frame GIF diversi devono essere distinte");
+            assert(key1.includes("gif_0"), "La chiave per il frame 0 deve includere l'indice corretto del frame GIF");
+            assert(key2.includes("gif_1"), "La chiave per il frame 1 deve includere l'indice corretto del frame GIF");
+
+            // Test 3: Sincronizzazione della timeline
+            console.log("Esecuzione Test 3: Verifica timeline e framesToAdd...");
+            
+            state.frames = [
+                { id: frame1Id, delay: 100, layers: [mainLayer1] }
+            ];
+            
+            const newRefGifFrames = [
+                document.createElement("canvas"),
+                document.createElement("canvas"),
+                document.createElement("canvas")
+            ];
+            
+            syncAnimatedReferenceToAllFrames(mainLayer1.id, newRefGifFrames, {
+                w: 100, h: 100, aspectRatio: 1, x: 0, y: 0, keepRatio: true
+            });
+
+            assert(state.frames.length === 3, "Il numero di fotogrammi del progetto deve essersi esteso a 3 fotogrammi");
+
+        } catch (e) {
+            results.success = false;
+            results.error = e.message;
+            console.error("Errore durante i test:", e);
+        }
+
+        console.log("Invio dei risultati del beta test al server locale...");
+        fetch("/api/test-results", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(results, null, 2)
+        })
+        .then(res => res.json())
+        .then(data => {
+            console.log("Risultati inviati con successo:", data);
+        })
+        .catch(err => {
+            console.error("Errore nell'invio dei risultati:", err);
+        });
     }
 
     startApp();
