@@ -34,6 +34,10 @@ echo 3b. Riduzione lingue Electron (solo inglese e italiano)...
 %POWERSHELL% -NoProfile -ExecutionPolicy Bypass -Command "$loc='dist\Gif Studio-win32-x64\locales'; if (Test-Path $loc) { Get-ChildItem $loc -Filter '*.pak' | Where-Object { $_.Name -notin 'en-US.pak','it.pak' } | Remove-Item -Force }"
 echo.
 
+echo 3c. Firma digitale dell'eseguibile interno Electron (Gif Studio.exe)...
+%POWERSHELL% -NoProfile -ExecutionPolicy Bypass -Command "$cert = Get-Item Cert:\CurrentUser\My\4E7F3FC75C4F266E768B30DC6FCAA64561E80A01; Set-AuthenticodeSignature -Certificate $cert -FilePath '.\dist\Gif Studio-win32-x64\Gif Studio.exe' -TimestampServer 'http://timestamp.digicert.com'"
+echo.
+
 echo 4. Compressione dell'applicazione in formato ZIP (app.zip)...
 %POWERSHELL% -NoProfile -ExecutionPolicy Bypass -Command "Compress-Archive -Path '.\dist\Gif Studio-win32-x64\*' -DestinationPath '.\dist\app.zip' -Force"
 if %ERRORLEVEL% neq 0 (
@@ -56,6 +60,10 @@ if %ERRORLEVEL% neq 0 (
     echo [ERRORE] Errore durante l'unione dei binari.
     goto error
 )
+echo.
+
+echo 6b. Firma digitale dell'eseguibile portatile finale (gifstudio-portable.exe)...
+%POWERSHELL% -NoProfile -ExecutionPolicy Bypass -Command "$cert = Get-Item Cert:\CurrentUser\My\4E7F3FC75C4F266E768B30DC6FCAA64561E80A01; Set-AuthenticodeSignature -Certificate $cert -FilePath '.\dist\gifstudio-portable.exe' -TimestampServer 'http://timestamp.digicert.com'"
 echo.
 
 echo 7. Pulizia finale e copia eseguibile nella cartella progetto...
