@@ -1,6 +1,6 @@
 [Setup]
 AppName=Gif Studio
-AppVersion=1.0.19
+AppVersion=1.0.3
 DefaultDirName={pf}\Gif Studio
 DefaultGroupName=Gif Studio
 OutputBaseFilename=GifStudio_Setup

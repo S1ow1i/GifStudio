@@ -23,7 +23,7 @@ if exist "dist\Gif Studio-win32-x64" rmdir /s /q "dist\Gif Studio-win32-x64"
 echo.
 
 echo 3. Pacchettizzazione (esclude dist, node_modules, scratch, exe, script build)...
-call "C:\Program Files\nodejs\npx.cmd" electron-packager . "Gif Studio" --platform=win32 --arch=x64 --out=dist --overwrite --icon=icon.ico --ignore="(^/dist|^/node_modules|^/scratch|^/Output|gifstudio-portable\.exe$|^/compila_exe\.bat$|^/icon\.ico$|^/package-lock\.json$)"
+call "C:\Program Files\nodejs\npx.cmd" electron-packager . "Gif Studio" --platform=win32 --arch=x64 --out=dist --overwrite --icon=icon.ico --ignore="(^/dist|^/node_modules|^/scratch|^/Output|gifstudio-portable\.exe$|^/compila_exe\.bat$|^/icon\.ico$|^/package-lock\.json$|^/GifStudio_Setup\.exe$|^/Applicazione_Portable)"
 if %ERRORLEVEL% neq 0 (
     echo [ERRORE] Errore durante l'esecuzione di electron-packager.
     goto error

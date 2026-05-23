@@ -1,6 +1,6 @@
 {
   "name": "gif-studio",
-  "version": "1.0.19",
+  "version": "1.0.3",
   "description": "Gif Studio - Modifica Foto e GIF Premium (Portable)",
   "main": "main.js",
   "scripts": {
