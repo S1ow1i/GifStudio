@@ -17,7 +17,7 @@ SetupIconFile=icon.ico
 
 [Files]
 ; Include the native Electron folder and public certificate
-Source: "Applicazione_Portable\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "C:\Users\Matte\Desktop\Progetto\dist\Gif Studio-win32-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "gifstudio-public.cer"; DestDir: "{app}"; Flags: ignoreversion
 Source: "icon.ico"; DestDir: "{app}"; Flags: ignoreversion
 
