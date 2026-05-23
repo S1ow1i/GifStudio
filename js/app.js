@@ -6473,6 +6473,205 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         });
 
+        // ==========================================
+        // GESTIONE SET COLORAZIONE PERSONALIZZATI
+        // ==========================================
+        function showCustomPrompt(message, defaultVal = "") {
+            return new Promise(resolve => {
+                const overlay = document.createElement("div");
+                overlay.style.position = "fixed";
+                overlay.style.top = "0"; overlay.style.left = "0"; overlay.style.width = "100vw"; overlay.style.height = "100vh";
+                overlay.style.backgroundColor = "rgba(0,0,0,0.8)";
+                overlay.style.zIndex = "10000"; overlay.style.display = "flex"; overlay.style.alignItems = "center"; overlay.style.justifyContent = "center";
+                
+                const box = document.createElement("div");
+                box.style.background = "#1a1c23"; box.style.padding = "20px"; box.style.borderRadius = "10px";
+                box.style.border = "1px solid var(--accent-color)"; box.style.boxShadow = "0 10px 30px rgba(0,0,0,0.5)";
+                box.style.width = "320px"; box.style.display = "flex"; box.style.flexDirection = "column"; box.style.gap = "15px";
+                
+                const msg = document.createElement("div");
+                msg.innerText = message; msg.style.color = "#fff"; msg.style.fontFamily = "var(--font-primary)";
+                msg.style.fontSize = "13px";
+                
+                const input = document.createElement("input");
+                input.type = "text"; input.value = defaultVal;
+                input.style.padding = "8px"; input.style.background = "#0f1013"; input.style.border = "1px solid #333";
+                input.style.color = "#fff"; input.style.borderRadius = "5px"; input.style.outline = "none";
+                
+                const btnRow = document.createElement("div");
+                btnRow.style.display = "flex"; btnRow.style.gap = "10px"; btnRow.style.justifyContent = "flex-end";
+                
+                const btnCancel = document.createElement("button");
+                btnCancel.innerText = "Annulla"; btnCancel.className = "btn-secondary"; btnCancel.style.padding = "6px 15px"; btnCancel.style.cursor = "pointer";
+                
+                const btnOk = document.createElement("button");
+                btnOk.innerText = "OK"; btnOk.className = "btn-primary"; btnOk.style.padding = "6px 15px"; btnOk.style.cursor = "pointer";
+                
+                btnRow.appendChild(btnCancel); btnRow.appendChild(btnOk);
+                box.appendChild(msg); box.appendChild(input); box.appendChild(btnRow);
+                overlay.appendChild(box);
+                document.body.appendChild(overlay);
+                
+                input.focus();
+                
+                const close = (val) => { overlay.remove(); resolve(val); };
+                btnCancel.onclick = () => close(null);
+                btnOk.onclick = () => close(input.value);
+                input.onkeydown = (e) => { if(e.key === "Enter") close(input.value); if(e.key === "Escape") close(null); };
+            });
+        }
+
+        function loadCustomThemes() {
+            const saved = localStorage.getItem("gifstudio_custom_themes");
+            if (saved) {
+                try {
+                    const customThemes = JSON.parse(saved);
+                    Object.keys(customThemes).forEach(key => {
+                        themes[key] = customThemes[key];
+                        addThemeButtonToGrid(key, customThemes[key].name || key);
+                    });
+                } catch(e) { console.error("Errore caricamento temi custom", e); }
+            }
+        }
+        
+        function addThemeButtonToGrid(key, name) {
+            const grid = document.querySelector('.preset-theme-grid');
+            if(!grid || document.getElementById(`theme-${key}`)) return;
+            const btn = document.createElement("button");
+            btn.className = "theme-btn custom-theme-btn";
+            btn.id = `theme-${key}`;
+            btn.dataset.theme = key;
+            btn.innerText = name;
+            // Gestione click tema
+            btn.addEventListener("click", (e) => {
+                applyThemePreset(key);
+            });
+            // Tasto destro per eliminare tema custom
+            btn.addEventListener("contextmenu", (e) => {
+                e.preventDefault();
+                if(confirm(`Vuoi eliminare il tema salvato "${name}"?`)) {
+                    delete customThemesObj[key];
+                    localStorage.setItem("gifstudio_custom_themes", JSON.stringify(customThemesObj));
+                    delete themes[key];
+                    btn.remove();
+                }
+            });
+            grid.appendChild(btn);
+        }
+
+        let customThemesObj = {};
+        try {
+            customThemesObj = JSON.parse(localStorage.getItem("gifstudio_custom_themes")) || {};
+        } catch(e) {}
+        
+        loadCustomThemes();
+
+        // Pulsante: Salva set colorazione
+        const btnSaveTheme = document.getElementById("btn-save-custom-theme");
+        if (btnSaveTheme) {
+            btnSaveTheme.addEventListener("click", async () => {
+                const themeName = await showCustomPrompt("Inserisci un nome per il tuo set di colori:");
+                if (!themeName || themeName.trim() === "") return;
+                
+                const key = "custom_" + Date.now();
+                const newTheme = {
+                    name: themeName,
+                    bg: dom.uiColorBg.value,
+                    win: dom.uiColorWin.value,
+                    text: dom.uiColorText.value,
+                    accent: dom.uiColorAccent.value,
+                    font: dom.uiFontFamily.value,
+                    radius: parseInt(dom.uiWindowRadius.value) || 10
+                };
+                
+                customThemesObj[key] = newTheme;
+                localStorage.setItem("gifstudio_custom_themes", JSON.stringify(customThemesObj));
+                themes[key] = newTheme;
+                addThemeButtonToGrid(key, themeName);
+                applyThemePreset(key);
+            });
+        }
+
+        // Pulsante: Esporta set colorazione
+        const btnExportTheme = document.getElementById("btn-export-custom-theme");
+        if (btnExportTheme) {
+            btnExportTheme.addEventListener("click", async () => {
+                const currentTheme = {
+                    type: "GifStudioTheme",
+                    bg: dom.uiColorBg.value,
+                    win: dom.uiColorWin.value,
+                    text: dom.uiColorText.value,
+                    accent: dom.uiColorAccent.value,
+                    font: dom.uiFontFamily.value,
+                    radius: parseInt(dom.uiWindowRadius.value) || 10
+                };
+                
+                try {
+                    if (typeof window.showSaveFilePicker === "function") {
+                        const fileHandle = await window.showSaveFilePicker({
+                            suggestedName: "IlMioStile_GifStudio.json",
+                            types: [{
+                                description: 'File Tema',
+                                accept: { 'application/json': ['.json'] }
+                            }]
+                        });
+                        const writable = await fileHandle.createWritable();
+                        await writable.write(JSON.stringify(currentTheme, null, 2));
+                        await writable.close();
+                    } else {
+                        // Fallback nel caso la funzione non sia disponibile
+                        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(currentTheme, null, 2));
+                        const anchor = document.createElement("a");
+                        anchor.href = dataStr;
+                        anchor.download = "IlMioStile_GifStudio.json";
+                        document.body.appendChild(anchor);
+                        anchor.click();
+                        anchor.remove();
+                    }
+                } catch(e) {
+                    console.log("Salvataggio set annullato dall'utente");
+                }
+            });
+        }
+
+        // Pulsante: Importa set colorazione
+        const btnImportTheme = document.getElementById("btn-import-custom-theme");
+        const inputImportTheme = document.getElementById("input-import-theme");
+        if (btnImportTheme && inputImportTheme) {
+            btnImportTheme.addEventListener("click", () => {
+                inputImportTheme.click();
+            });
+            inputImportTheme.addEventListener("change", (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = async (event) => {
+                    try {
+                        const importedTheme = JSON.parse(event.target.result);
+                        if (importedTheme && importedTheme.bg && importedTheme.win) {
+                            const themeName = await showCustomPrompt("Nome per il tema importato:", file.name.replace(".json", ""));
+                            if (!themeName) return;
+                            
+                            const key = "custom_imp_" + Date.now();
+                            importedTheme.name = themeName;
+                            
+                            customThemesObj[key] = importedTheme;
+                            localStorage.setItem("gifstudio_custom_themes", JSON.stringify(customThemesObj));
+                            themes[key] = importedTheme;
+                            addThemeButtonToGrid(key, themeName);
+                            applyThemePreset(key);
+                        } else {
+                            alert("File non valido o corrotto.");
+                        }
+                    } catch(err) {
+                        alert("Errore durante l'importazione del file JSON.");
+                    }
+                    inputImportTheme.value = ""; // Reset input
+                };
+                reader.readAsText(file);
+            });
+        }
+
         dom.uiColorBg.addEventListener("input", () => {
             updateThemeColors();
             document.querySelectorAll(".theme-btn").forEach(btn => btn.classList.remove("active"));
@@ -7290,7 +7489,7 @@ document.addEventListener("DOMContentLoaded", () => {
             let clickedThemeTitle = false;
             let tempElement = target;
             while(tempElement && tempElement !== document.body) {
-                if(tempElement.id === "tut-title-themes") {
+                if(tempElement.id === "app-main-title") {
                     clickedThemeTitle = true; break;
                 }
                 tempElement = tempElement.parentElement;

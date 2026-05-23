@@ -38,7 +38,7 @@
             <div class="top-bar-hub" style="display: flex; flex: 1; align-items: center; justify-content: center; position: relative;">
                 <!-- LOGO AREA (Spostata al centro e ingrandita, senza icona) -->
                 <div class="logo-area" style="position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center; z-index: 5;">
-                    <span class="app-title" style="font-family: 'Orbitron', sans-serif; font-size: 1.8rem; letter-spacing: 3px; font-weight: 800; color: var(--accent-color); text-shadow: 0 0 16px rgba(var(--accent-color-rgb), 0.6); white-space: nowrap;">GIF STUDIO</span>
+                    <span id="app-main-title" class="app-title" style="font-family: 'Orbitron', sans-serif; font-size: 1.8rem; letter-spacing: 3px; font-weight: 800; color: var(--accent-color); text-shadow: 0 0 16px rgba(var(--accent-color-rgb), 0.6); white-space: nowrap; cursor: pointer;">GIF STUDIO</span>
                 </div>
 
                 <!-- Status info ultra-compatto (solo icona + valore) a destra -->
@@ -205,7 +205,7 @@
                     <div id="tab-project-style" class="tab-content tab-fill">
                         <div class="control-group">
                             <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                                <label id="tut-title-themes" style="margin-bottom: 0;">Temi già pronti</label>
+                                <label id="tut-title-themes" style="margin-bottom: 0;">Temi</label>
                                 <div class="tab-order-selector" title="Ordine di visualizzazione della scheda in alto">
                                     <span>Pos:</span><input type="number" class="tab-order-input" data-target="tab-project-style" min="1" max="10" value="2">
                                 </div>
@@ -240,7 +240,8 @@
                                     <input type="color" id="ui-color-accent" value="#00ffcc">
                                 </div>
                             </div>
-                            <div class="color-sync-tools" style="display: flex; gap: 6px; margin-top: 12px; align-items: center; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 6px; border: 1px solid var(--border-window);">
+                            <div style="margin-top: 14px; font-size: 11px; font-weight: 600; opacity: 0.7; margin-bottom: 4px;">Strumento Copia Colore</div>
+                            <div class="color-sync-tools" style="display: flex; gap: 6px; align-items: center; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 6px; border: 1px solid var(--border-window);">
                                 <select id="sync-color-select" class="ui-select" style="flex:1; font-size:11px; padding: 2px 6px;">
                                     <option value="ui-color-bg">Sfondo</option>
                                     <option value="ui-color-win">Finestre</option>
@@ -249,6 +250,15 @@
                                 </select>
                                 <button id="btn-copy-color-slot" class="btn-secondary" style="padding: 4px 10px; font-size:11px; height:24px;">Copia</button>
                                 <button id="btn-paste-color-slot" class="btn-secondary" style="padding: 4px 10px; font-size:11px; height:24px;">Incolla</button>
+                            </div>
+                            
+                            <div style="margin-top: 14px; display: flex; flex-direction: column; gap: 6px;">
+                                <button id="btn-save-custom-theme" class="btn-primary" style="font-size:11px; padding: 6px;">Salva set colorazione</button>
+                                <div style="display: flex; gap: 6px;">
+                                    <button id="btn-export-custom-theme" class="btn-secondary" style="flex:1; font-size:11px; padding: 6px;">Esporta set</button>
+                                    <button id="btn-import-custom-theme" class="btn-secondary" style="flex:1; font-size:11px; padding: 6px;">Importa set</button>
+                                    <input type="file" id="input-import-theme" accept=".json" style="display: none;">
+                                </div>
                             </div>
                         </div>
 
