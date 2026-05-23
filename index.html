@@ -30,16 +30,15 @@
     <div id="desktop">
         <!-- Barra Superiore di Controllo -->
         <header id="top-bar">
-            <!-- LOGO AREA -->
-            <div class="logo-area" style="display: flex; flex-direction: row; align-items: center; gap: 10px; margin-right: 18px; flex-shrink: 0;">
-                <img class="app-icon" src="icon.png" width="52" height="52" alt="Gif Studio Icon" style="border-radius: 10px; object-fit: cover; box-shadow: 0 0 16px rgba(var(--accent-color-rgb), 0.4), 0 2px 8px rgba(0,0,0,0.5);">
-                <span class="app-title" style="font-family: 'Orbitron', sans-serif; font-size: 1.25rem; letter-spacing: 2px; font-weight: 700; color: var(--accent-color); text-shadow: 0 0 12px rgba(var(--accent-color-rgb), 0.55); white-space: nowrap;">GIF STUDIO</span>
+            <!-- LAYOUT CONTROLS AREA (Spostata a sinistra) -->
+            <div class="top-bar-launcher-row" style="display: flex; flex-direction: row; align-items: center; margin-right: auto; padding-left: 10px; z-index: 10;">
+                <div id="quick-launcher" title="Mostra o nascondi le finestre dell'app" style="display: flex; gap: 8px; align-items: center;"></div>
             </div>
             
             <div class="top-bar-hub" style="display: flex; flex: 1; align-items: center; justify-content: center; position: relative;">
-                <!-- Isola di comando CENTRATA -->
-                <div class="top-bar-launcher-row" style="position: absolute; left: 50%; transform: translateX(-50%);">
-                    <div id="quick-launcher" class="glass-dock glass-dock-top" title="Mostra o nascondi le finestre dell'app"></div>
+                <!-- LOGO AREA (Spostata al centro e ingrandita, senza icona) -->
+                <div class="logo-area" style="position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center; z-index: 5;">
+                    <span class="app-title" style="font-family: 'Orbitron', sans-serif; font-size: 1.8rem; letter-spacing: 3px; font-weight: 800; color: var(--accent-color); text-shadow: 0 0 16px rgba(var(--accent-color-rgb), 0.6); white-space: nowrap;">GIF STUDIO</span>
                 </div>
 
                 <!-- Status info ultra-compatto (solo icona + valore) a destra -->
@@ -212,12 +211,12 @@
                                 </div>
                             </div>
                             <div class="preset-theme-grid">
-                                <button id="theme-dark" class="theme-btn active" data-theme="dark">Slate Grigio</button>
-                                <button id="theme-cyber" class="theme-btn" data-theme="cyber">Vetro Liquido</button>
-                                <button id="theme-terminal" class="theme-btn" data-theme="terminal">Marmo Nero</button>
-                                <button id="theme-light" class="theme-btn" data-theme="light">Marmo Bianco</button>
-                                <button id="theme-concrete" class="theme-btn" data-theme="concrete">Cemento Minimal</button>
-                                <button id="theme-retro" class="theme-btn" data-theme="retro">Retro Terminal</button>
+                                <button id="theme-default" class="theme-btn active" data-theme="default">Slate Grigio</button>
+                                <button id="theme-cyber" class="theme-btn" data-theme="cyber">Neon Cyber</button>
+                                <button id="theme-dark" class="theme-btn" data-theme="dark">OLED Pure</button>
+                                <button id="theme-light" class="theme-btn" data-theme="light">Nordic Light</button>
+                                <button id="theme-concrete" class="theme-btn" data-theme="concrete">Dracula</button>
+                                <button id="theme-retro" class="theme-btn" data-theme="retro">Synthwave</button>
                             </div>
                         </div>
                         
@@ -241,6 +240,16 @@
                                     <input type="color" id="ui-color-accent" value="#00ffcc">
                                 </div>
                             </div>
+                            <div class="color-sync-tools" style="display: flex; gap: 6px; margin-top: 12px; align-items: center; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 6px; border: 1px solid var(--border-window);">
+                                <select id="sync-color-select" class="ui-select" style="flex:1; font-size:11px; padding: 2px 6px;">
+                                    <option value="ui-color-bg">Sfondo</option>
+                                    <option value="ui-color-win">Finestre</option>
+                                    <option value="ui-color-text">Testi</option>
+                                    <option value="ui-color-accent" selected>Dettagli</option>
+                                </select>
+                                <button id="btn-copy-color-slot" class="btn-secondary" style="padding: 4px 10px; font-size:11px; height:24px;">Copia</button>
+                                <button id="btn-paste-color-slot" class="btn-secondary" style="padding: 4px 10px; font-size:11px; height:24px;">Incolla</button>
+                            </div>
                         </div>
 
                         <div class="control-group" style="border-bottom:none; padding-bottom:0;">
@@ -248,14 +257,15 @@
                             <div class="input-row">
                                 <div class="input-field">
                                     <span>Carattere:</span>
-                                    <select id="ui-font-family" class="select-field">
+                                    <select id="ui-font-family" class="ui-select">
                                         <option value="Inter">Inter (Sans moderno)</option>
-                                        <option value="Outfit">Outfit (Tondo morbido)</option>
-                                        <option value="JetBrains Mono">JetBrains Mono (Tecnico)</option>
-                                        <option value="Poppins">Poppins (Geometrico)</option>
-                                        <option value="Playfair Display">Playfair (Classico)</option>
-                                        <option value="Pacifico">Pacifico (Scrittura a mano)</option>
-                                        <option value="system-ui">Carattere del PC</option>
+                                        <option value="Roboto">Roboto</option>
+                                        <option value="Poppins">Poppins</option>
+                                        <option value="Montserrat">Montserrat</option>
+                                        <option value="Open Sans">Open Sans</option>
+                                        <option value="'Fira Code', monospace">Fira Code (Mono)</option>
+                                        <option value="'Orbitron', sans-serif">Orbitron (Cyber)</option>
+                                        <option value="system-ui">System Default</option>
                                     </select>
                                 </div>
                                 <div class="input-field" style="width: 90px; flex: 0 0 90px;">
@@ -679,73 +689,86 @@
                         <button class="win-btn win-minimize">&#8722;</button>
                     </div>
                 </div>
-                <div class="window-tabs-header">
-                    <button class="tab-btn active" data-tab="tab-timeline-content">🎞️ Sequenza Frame</button>
-                </div>
-                <div class="window-content timeline-workspace">
-                    <div id="tab-timeline-content" class="tab-content active-content timeline-tab-panel">
-                        <div class="timeline-compact" title="Controlli sequenza e keyframe">
-                            <div class="timeline-row timeline-row-play">
-                                <button id="btn-play-gif" class="btn btn-accent btn-tl-play" title="Riproduci / Pausa">
-                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-                                </button>
-                                <div class="tl-group tl-ms">
-                                    <span class="tl-lbl">ms</span>
-                                    <input type="number" id="timeline-delay" value="100" min="10" max="5000" title="Durata frame in millisecondi">
-                                    <button id="btn-apply-delay-all" class="btn btn-secondary btn-tl-mini" title="Applica ms a tutti i frame">Tutti</button>
-                                </div>
-                                <div class="tl-group tl-actions">
-                                    <button id="btn-duplicate-frame" class="btn btn-secondary btn-tl-icon" title="Duplica frame">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                                    </button>
-                                    <button id="btn-delete-frame" class="btn btn-danger btn-tl-icon" title="Elimina frame">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
-                                    </button>
-                                    <button id="btn-reverse-frames" class="btn btn-secondary btn-tl-icon" title="Inverti ordine frame">↔</button>
-                                </div>
-                                <div class="tl-group tl-prev">
-                                    <span class="tl-lbl">Prev</span>
-                                    <select id="timeline-speed-scale" class="select-field-sm" title="Velocità anteprima playback">
-                                        <option value="1">1x</option>
-                                        <option value="0.5">0.5x</option>
-                                        <option value="1.5">1.5x</option>
-                                        <option value="2">2x</option>
-                                    </select>
-                                </div>
-                                <button id="btn-optimize-gif" class="btn btn-secondary btn-tl-icon" title="Ottimizza GIF (rimuove frame statici duplicati)">⚡</button>
-                            </div>
-                            <div class="timeline-row timeline-row-kf">
-                                <span class="tl-kf-badge" title="Keyframe — anima il livello tra i frame">◆</span>
-                                <select id="keyframe-target" class="select-field-sm" title="Livello da animare">
-                                    <option value="main">Principale</option>
-                                    <option value="reference">Riferimento</option>
-                                    <option value="active">Attivo</option>
-                                </select>
-                                <label class="kf-chip kf-auto-label" title="Registra keyframe automaticamente">
-                                    <input type="checkbox" id="kf-auto-keyframe" checked> Auto
-                                </label>
-                                <div class="kf-chips">
-                                    <label class="kf-chip" title="X"><input type="checkbox" id="kf-prop-x" checked> X</label>
-                                    <label class="kf-chip" title="Y"><input type="checkbox" id="kf-prop-y" checked> Y</label>
-                                    <label class="kf-chip" title="Rotazione"><input type="checkbox" id="kf-prop-r" checked> R</label>
-                                    <label class="kf-chip" title="Opacità"><input type="checkbox" id="kf-prop-opacity" checked> Op</label>
-                                </div>
-                                <details class="kf-more">
-                                    <summary class="btn btn-secondary btn-tl-mini" title="Z, larghezza, altezza">+</summary>
-                                    <div class="kf-chips kf-chips-extra">
-                                        <label class="kf-chip"><input type="checkbox" id="kf-prop-z"> Z</label>
-                                        <label class="kf-chip"><input type="checkbox" id="kf-prop-w"> W</label>
-                                        <label class="kf-chip"><input type="checkbox" id="kf-prop-h"> H</label>
-                                    </div>
-                                </details>
-                                <div class="kf-nav">
-                                    <button type="button" id="btn-goto-prev-keyframe" class="btn btn-secondary btn-tl-mini" title="Keyframe precedente">◀</button>
-                                    <button type="button" id="btn-add-keyframe" class="btn btn-accent btn-tl-mini" title="Aggiungi keyframe sul frame corrente">◆</button>
-                                    <button type="button" id="btn-delete-keyframe" class="btn btn-secondary btn-tl-mini" title="Rimuovi keyframe">✕</button>
-                                    <button type="button" id="btn-goto-next-keyframe" class="btn btn-secondary btn-tl-mini" title="Keyframe successivo">▶</button>
-                                </div>
-                            </div>
+                <div class="timeline-compact" title="Controlli sequenza e keyframe" style="display:flex; flex-direction:row; gap:10px; flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; background: rgba(0,0,0,0.2); border-bottom: 1px solid var(--border-window); padding: 6px 12px; min-height: 44px; align-items:center;">
+                    
+                    <button id="btn-play-gif" class="btn btn-accent btn-tl-play" title="Riproduci / Pausa" style="flex-shrink:0;">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    </button>
+                    
+                    <div class="tl-group tl-ms" style="flex-shrink:0;">
+                        <span class="tl-lbl">ms</span>
+                        <input type="number" id="timeline-delay" value="100" min="10" max="5000" title="Durata frame in millisecondi">
+                        <button id="btn-apply-delay-all" class="btn btn-secondary btn-tl-mini" title="Applica ms a tutti i frame">Tutti</button>
+                    </div>
+                    
+                    <div class="tl-group tl-actions" style="flex-shrink:0;">
+                        <button id="btn-duplicate-frame" class="btn btn-secondary btn-tl-icon" title="Duplica frame">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                        </button>
+                        <button id="btn-delete-frame" class="btn btn-danger btn-tl-icon" title="Elimina frame">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+                        </button>
+                        <button id="btn-reverse-frames" class="btn btn-secondary btn-tl-icon" title="Inverti ordine frame">↔</button>
+                    </div>
+                    
+                    <div class="tl-group tl-prev" style="flex-shrink:0;">
+                        <span class="tl-lbl">Prev</span>
+                        <select id="timeline-speed-scale" class="select-field-sm" title="Velocità anteprima playback">
+                            <option value="1">1x</option>
+                            <option value="0.5">0.5x</option>
+                            <option value="1.5">1.5x</option>
+                            <option value="2">2x</option>
+                        </select>
+                    </div>
+                    
+                    <button id="btn-optimize-gif" class="btn btn-secondary btn-tl-icon" title="Ottimizza GIF (rimuove frame statici duplicati)" style="flex-shrink:0;">⚡</button>
+                    
+                    <!-- Divisore Verticale -->
+                    <div style="width: 1px; height: 24px; background: rgba(255,255,255,0.1); margin: 0 4px; flex-shrink:0;"></div>
+
+                    <span class="tl-kf-badge" title="Keyframe — anima il livello tra i frame" style="flex-shrink:0;">◆</span>
+                    
+                    <select id="keyframe-target" class="select-field-sm" title="Livello da animare" style="flex-shrink:0;">
+                        <option value="main">Principale</option>
+                        <option value="reference">Riferimento</option>
+                        <option value="active">Attivo</option>
+                    </select>
+                    
+                    <label class="kf-chip kf-auto-label" title="Registra keyframe automaticamente" style="flex-shrink:0;">
+                        <input type="checkbox" id="kf-auto-keyframe" checked> Auto
+                    </label>
+                    
+                    <div class="kf-chips" style="flex-shrink:0;">
+                        <label class="kf-chip" title="X"><input type="checkbox" id="kf-prop-x" checked> X</label>
+                        <label class="kf-chip" title="Y"><input type="checkbox" id="kf-prop-y" checked> Y</label>
+                        <label class="kf-chip" title="Rotazione"><input type="checkbox" id="kf-prop-r" checked> R</label>
+                        <label class="kf-chip" title="Opacità"><input type="checkbox" id="kf-prop-opacity" checked> Op</label>
+                    </div>
+                    
+                    <details class="kf-more" style="flex-shrink:0;">
+                        <summary class="btn btn-secondary btn-tl-mini" title="Z, larghezza, altezza">+</summary>
+                        <div class="kf-chips kf-chips-extra">
+                            <label class="kf-chip"><input type="checkbox" id="kf-prop-z"> Z</label>
+                            <label class="kf-chip"><input type="checkbox" id="kf-prop-w"> W</label>
+                            <label class="kf-chip"><input type="checkbox" id="kf-prop-h"> H</label>
                         </div>
+                    </details>
+                    
+                    <div class="kf-nav" style="display:flex; gap:4px; flex-shrink:0;">
+                        <button type="button" id="btn-goto-prev-keyframe" class="btn btn-secondary btn-tl-mini" title="Keyframe precedente">◀</button>
+                        <button type="button" id="btn-add-keyframe" class="btn btn-accent btn-tl-mini" title="Aggiungi keyframe sul frame corrente">◆</button>
+                        <button type="button" id="btn-delete-keyframe" class="btn btn-secondary btn-tl-mini" title="Rimuovi keyframe">✕</button>
+                        <button type="button" id="btn-goto-next-keyframe" class="btn btn-secondary btn-tl-mini" title="Keyframe successivo">▶</button>
+                    </div>
+
+                    <!-- TAB SPOSTATA SULLA DESTRA (SPINTA DA MARGIN-LEFT: AUTO) -->
+                    <div class="window-tabs-header" style="border: none; background: transparent; min-height: unset; height: auto; display: flex; align-items: center; padding: 0; margin-left: auto; flex-shrink: 0;">
+                        <button class="tab-btn active" data-tab="tab-timeline-content" style="margin: 0; white-space: nowrap;">🎞️ Sequenza Frame</button>
+                    </div>
+
+                </div>
+                <div class="window-content timeline-workspace" style="display:flex; flex:1; min-height:0;">
+                    <div id="tab-timeline-content" class="tab-content active-content timeline-tab-panel" style="display:flex; flex-direction:column; height: 100%; flex:1;">
 
                         <div class="timeline-dual-scroll" id="timeline-scroll-container">
                             <div class="timeline-track-labels">

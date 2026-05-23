@@ -6326,53 +6326,53 @@ document.addEventListener("DOMContentLoaded", () => {
         const root = document.documentElement;
 
         const themes = {
-            dark: {
-                bg: "#111216",
-                win: "#1c1e25",
+            default: {
+                bg: "#0f1013",
+                win: "#1a1c23",
                 text: "#f1f5f9",
                 accent: "#00ffcc",
                 font: "Inter",
                 radius: 10
             },
             cyber: {
-                bg: "#0a0e17",
-                win: "#ffffff", // Verrà impostato come trasparente rgba nel codice sotto
+                bg: "#050510",
+                win: "#0f0f20", 
                 text: "#ffffff",
-                accent: "#ffffff",
-                font: "Poppins",
-                radius: 16
+                accent: "#ff00ff", // Magenta acceso (Neon Cyber)
+                font: "Orbitron",
+                radius: 12
             },
-            terminal: {
-                bg: "#07080a",
-                win: "#14161a",
-                text: "#fcfbf7",
-                accent: "#d4af37", // Oro
-                font: "Playfair Display",
-                radius: 8
+            dark: {
+                bg: "#000000",
+                win: "#090909",
+                text: "#ffffff",
+                accent: "#ffffff", // Bianco puro (OLED Pure)
+                font: "Inter",
+                radius: 6
             },
             light: {
-                bg: "#eaecef",
-                win: "#ffffff",
-                text: "#1e293b",
-                accent: "#475569", // Grigio scuro
-                font: "Outfit",
+                bg: "#e2e8f0", // Grigio azzurro chiaro, non accecante
+                win: "#f1f5f9", // Leggermente più chiaro dello sfondo per le finestre
+                text: "#2b3440", // Scuro leggibile
+                accent: "#5c7cfa", // Blu pastello nordico (Nordic Light)
+                font: "Poppins",
                 radius: 12
             },
             concrete: {
-                bg: "#2e3136",
-                win: "#373b42",
-                text: "#e8e8e8",
-                accent: "#ff5500", // Cemento arancione
+                bg: "#282a36",
+                win: "#44475a",
+                text: "#f8f8f2",
+                accent: "#ff79c6", // Rosa acceso (Dracula)
                 font: "Roboto",
-                radius: 4
+                radius: 8
             },
             retro: {
-                bg: "#000000",
-                win: "#050f05",
-                text: "#33ff33",
-                accent: "#33ff33",
-                font: "JetBrains Mono",
-                radius: 0
+                bg: "#110b1a",
+                win: "#221533",
+                text: "#00ffff", // Ciano (Synthwave)
+                accent: "#ff007f", // Rosa shocking
+                font: "'Fira Code', monospace",
+                radius: 4
             }
         };
 
@@ -6392,7 +6392,20 @@ document.addEventListener("DOMContentLoaded", () => {
             root.style.setProperty("--bg-window", `rgba(${winRgb.r}, ${winRgb.g}, ${winRgb.b}, ${alphaWin})`);
             root.style.setProperty("--bg-header", `rgba(${winRgb.r}, ${winRgb.g}, ${winRgb.b}, 0.95)`);
             
+            // LOGICA TESTI CON PROFONDITÀ (Richiesta Utente)
+            const textRgb = hexToRgb(textVal);
+            
+            // Text Main (Colore base Testi): Ombra più definita e bagliore
             root.style.setProperty("--text-main", textVal);
+            root.style.setProperty("--text-shadow-main", `0 1px 3px rgba(0,0,0,0.8), 0 0 6px rgba(${textRgb.r}, ${textRgb.g}, ${textRgb.b}, 0.45)`);
+            
+            // Text Secondary (Variante più chiara per maggiore leggibilità, 80% invece di 65%)
+            const rSec = Math.round(textRgb.r * 0.85);
+            const gSec = Math.round(textRgb.g * 0.85);
+            const bSec = Math.round(textRgb.b * 0.85);
+            root.style.setProperty("--text-secondary", `rgb(${rSec}, ${gSec}, ${bSec})`);
+            root.style.setProperty("--text-shadow-secondary", `0 1px 2px rgba(0,0,0,0.8)`);
+
             root.style.setProperty("--accent-color", accentVal);
             root.style.setProperty("--accent-color-rgb", `${accentRgb.r}, ${accentRgb.g}, ${accentRgb.b}`);
             
@@ -6417,6 +6430,14 @@ document.addEventListener("DOMContentLoaded", () => {
         window._gifStudioUpdateThemeColors = updateThemeColors;
 
         function applyThemePreset(themeKey) {
+            if (window._akiInterval) {
+                clearInterval(window._akiInterval);
+                window._akiInterval = null;
+            }
+            document.body.classList.remove("aki-mode-active");
+            document.body.classList.remove("sind-mode-active");
+            document.querySelectorAll(".sind-entity").forEach(f => f.remove());
+            
             const t = themes[themeKey];
             if (!t) return;
 
@@ -6431,7 +6452,8 @@ document.addEventListener("DOMContentLoaded", () => {
             dom.uiRadiusVal.innerText = `${t.radius}px`;
 
             if (themeKey === "cyber") {
-                dom.uiColorWin.value = "#ffffff";
+                // Neon Cyber win override
+                dom.uiColorWin.value = "#0f0f20";
             } else {
                 dom.uiColorWin.value = t.win;
             }
@@ -6487,6 +6509,54 @@ document.addEventListener("DOMContentLoaded", () => {
             dom.uiRadiusVal.innerText = `${e.target.value}px`;
             saveUiPreferences();
         });
+
+        // ==========================================
+        // GESTIONE COPIA/INCOLLA COLORI (TASTO DESTRO)
+        // ==========================================
+        function showToast(msg, duration = 2000) {
+            let toast = document.getElementById("gifstudio-toast");
+            if (!toast) {
+                toast = document.createElement("div");
+                toast.id = "gifstudio-toast";
+                toast.style.cssText = "position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--accent-color); color:#fff; padding:8px 16px; border-radius:20px; font-weight:700; font-size:12px; z-index:99999; box-shadow:0 4px 12px rgba(0,0,0,0.5); opacity:0; transition:opacity 0.3s; pointer-events:none;";
+                document.body.appendChild(toast);
+            }
+            toast.innerText = msg;
+            toast.style.opacity = "1";
+            if (toast.timeoutId) clearTimeout(toast.timeoutId);
+            toast.timeoutId = setTimeout(() => toast.style.opacity = "0", duration);
+        }
+
+        // ==========================================
+        // GESTIONE COPIA/INCOLLA COLORI (PULSANTI ESPLICITI)
+        // ==========================================
+        const btnCopySlot = document.getElementById("btn-copy-color-slot");
+        const btnPasteSlot = document.getElementById("btn-paste-color-slot");
+        const syncColorSelect = document.getElementById("sync-color-select");
+        let syncClipboard = null;
+
+        if (btnCopySlot && btnPasteSlot && syncColorSelect) {
+            btnCopySlot.addEventListener("click", () => {
+                const sourceInput = document.getElementById(syncColorSelect.value);
+                if (sourceInput) {
+                    syncClipboard = sourceInput.value;
+                    const slotName = syncColorSelect.options[syncColorSelect.selectedIndex].text;
+                    showToast(`Colore copiato da ${slotName} (${syncClipboard})`, 2500);
+                }
+            });
+
+            btnPasteSlot.addEventListener("click", () => {
+                const targetInput = document.getElementById(syncColorSelect.value);
+                if (targetInput && syncClipboard) {
+                    targetInput.value = syncClipboard;
+                    targetInput.dispatchEvent(new Event("input")); // Applica la modifica e aggiorna il tema
+                    const slotName = syncColorSelect.options[syncColorSelect.selectedIndex].text;
+                    showToast(`Colore incollato su ${slotName}!`, 2000);
+                } else if (!syncClipboard) {
+                    showToast("Prima copia un colore!", 2000);
+                }
+            });
+        }
 
     }
 
@@ -7191,6 +7261,9 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
 
+        let akiEasterEggClicks = 0;
+        let akiBarVisible = false;
+
         // Intercetta tutti i click in fase di cattura
         document.addEventListener("click", (e) => {
             if(!isTutorialMode) return;
@@ -7212,6 +7285,428 @@ document.addEventListener("DOMContentLoaded", () => {
             let explanation = null;
             let currentElement = target;
             let elementTitle = "";
+
+            // EASTER EGG AKI MODE
+            let clickedThemeTitle = false;
+            let tempElement = target;
+            while(tempElement && tempElement !== document.body) {
+                if(tempElement.id === "tut-title-themes") {
+                    clickedThemeTitle = true; break;
+                }
+                tempElement = tempElement.parentElement;
+            }
+
+            if (clickedThemeTitle) {
+                akiEasterEggClicks++;
+                if (akiEasterEggClicks === 10 && !akiBarVisible) {
+                    akiBarVisible = true;
+                    const canvasWorkspace = document.querySelector('.canvas-workspace-wrapper');
+                    const akiBar = document.createElement('div');
+                    akiBar.id = "aki-secret-bar";
+                    akiBar.style.position = "absolute";
+                    akiBar.style.top = "50%";
+                    akiBar.style.left = "50%";
+                    akiBar.style.transform = "translate(-50%, -50%)";
+                    akiBar.style.background = "rgba(0,0,0,0.85)";
+                    akiBar.style.padding = "10px 20px";
+                    akiBar.style.borderRadius = "8px";
+                    akiBar.style.border = "1px solid var(--accent-color)";
+                    akiBar.style.zIndex = "9999";
+                    akiBar.style.display = "flex";
+                    akiBar.style.gap = "10px";
+                    akiBar.style.boxShadow = "0 4px 15px rgba(0,0,0,0.5)";
+                    akiBar.innerHTML = `
+                        <span style="color: var(--accent-color); font-weight: bold; font-size: 14px; line-height: 24px;">Code:</span>
+                        <input type="text" id="aki-secret-input" placeholder="..." style="background: #111; color: white; border: 1px solid #333; padding: 4px 8px; border-radius: 4px; outline: none; width: 100px;">
+                        <button id="aki-secret-submit" class="btn btn-accent btn-sm">Enter</button>
+                    `;
+                    canvasWorkspace.appendChild(akiBar);
+                    // Disattiva modalita tutorial per poter scrivere
+                    if (isTutorialMode) btnTutorial.click();
+
+                    document.getElementById("aki-secret-submit").addEventListener("click", () => {
+                        const val = document.getElementById("aki-secret-input").value.trim().toLowerCase();
+                        if (val === "aki") {
+                            akiBar.remove();
+                            akiEasterEggClicks = 0;
+                            akiBarVisible = false;
+                            
+                            // Disattiva e rimuovi Sind se esiste
+                            const oldSindBtn = document.getElementById("btn-theme-sind");
+                            if (oldSindBtn) oldSindBtn.remove();
+                            document.body.classList.remove("sind-mode-active");
+                            document.querySelectorAll(".sind-entity").forEach(f => f.remove());
+
+                            const themesGrid = document.querySelector('.preset-theme-grid');
+                            if (themesGrid && !document.getElementById("btn-theme-aki")) {
+                                const akiBtn = document.createElement('button');
+                                akiBtn.id = "btn-theme-aki";
+                                akiBtn.className = "theme-btn";
+                                akiBtn.innerText = "Aki Mode";
+                                akiBtn.style.background = "linear-gradient(45deg, #ff0000, #00ff00, #0000ff)";
+                                akiBtn.style.backgroundSize = "200% 200%";
+                                akiBtn.style.color = "white";
+                                akiBtn.style.fontWeight = "bold";
+                                akiBtn.style.border = "2px solid #fff";
+                                akiBtn.style.boxShadow = "0 0 10px #ff0000";
+                                akiBtn.style.animation = "akiBtnAnim 2s linear infinite";
+                                
+                                akiBtn.addEventListener("click", () => {
+                                    const allBtns = document.querySelectorAll('.preset-theme-grid .theme-btn');
+                                    
+                                    if(document.body.classList.contains("aki-mode-active")) {
+                                        // Spegni Aki Mode e torna al default
+                                        document.querySelector(".preset-theme-grid .theme-btn[data-theme='default']").click(); 
+                                    } else {
+                                        // Togli "active" da tutti gli altri temi
+                                        allBtns.forEach(b => b.classList.remove('active'));
+                                        // Metti "active" a questo
+                                        akiBtn.classList.add('active');
+                                        
+                                        // Disattiva Sind se era attivo
+                                        document.body.classList.remove("sind-mode-active");
+                                        document.querySelectorAll(".sind-entity").forEach(f => f.remove());
+                                        
+                                        document.body.classList.add("aki-mode-active");
+                                        
+                                        // Helper per convertire HSL in RGB (necessario per --accent-color-rgb)
+                                        const hslToRgbStr = (h, s, l) => {
+                                            let r, g, b; h /= 360;
+                                            if (s === 0) { r = g = b = l; } else {
+                                                const hue2rgb = (p, q, t) => {
+                                                    if (t < 0) t += 1; if (t > 1) t -= 1;
+                                                    if (t < 1/6) return p + (q - p) * 6 * t;
+                                                    if (t < 1/2) return q;
+                                                    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+                                                    return p;
+                                                };
+                                                const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+                                                const p = 2 * l - q;
+                                                r = hue2rgb(p, q, h + 1/3); g = hue2rgb(p, q, h); b = hue2rgb(p, q, h - 1/3);
+                                            }
+                                            return Math.round(r * 255) + ", " + Math.round(g * 255) + ", " + Math.round(b * 255);
+                                        };
+
+                                        let hue = 0;
+                                        if (window._akiInterval) clearInterval(window._akiInterval);
+                                        
+                                        window._akiInterval = setInterval(() => {
+                                            hue = (hue + 1.5) % 360; // Velocità del loop RGB
+                                            
+                                            // Sfondo principale RGB sfumato a 3 colori (solo gradiente)
+                                            document.documentElement.style.setProperty('--aki-bg', `linear-gradient(135deg, hsl(${hue}, 100%, 50%), hsl(${(hue + 45) % 360}, 100%, 50%), hsl(${(hue + 90) % 360}, 100%, 50%))`);
+                                            document.documentElement.style.setProperty('--desktop-pattern', 'none'); 
+                                            
+                                            // Finestre ed Header semi-trasparenti
+                                            document.documentElement.style.setProperty('--bg-window', `hsla(${(hue + 180) % 360}, 100%, 12%, 0.8)`);
+                                            document.documentElement.style.setProperty('--bg-header', `hsla(${(hue + 200) % 360}, 100%, 10%, 0.9)`);
+                                            
+                                            // Testi RGB puri
+                                            document.documentElement.style.setProperty('--text-main', `hsl(${hue}, 100%, 80%)`);
+                                            document.documentElement.style.setProperty('--text-secondary', `hsl(${(hue + 60) % 360}, 100%, 65%)`);
+                                            
+                                            // Dettagli, accenti, bordi, ombre
+                                            document.documentElement.style.setProperty('--border-window', `hsl(${(hue + 270) % 360}, 100%, 50%)`);
+                                            document.documentElement.style.setProperty('--accent-color', `hsl(${(hue + 270) % 360}, 100%, 50%)`);
+                                            document.documentElement.style.setProperty('--accent-color-rgb', hslToRgbStr((hue + 270) % 360, 1, 0.5));
+                                        }, 35);
+                                    }
+                                });
+                                themesGrid.appendChild(akiBtn);
+
+                                if(!document.getElementById("aki-css-anim")) {
+                                    const style = document.createElement('style');
+                                    style.id = "aki-css-anim";
+                                    style.innerHTML = `
+                                        @keyframes akiBtnAnim { 
+                                            0% { background-position: 0% 50%; box-shadow: 0 0 10px #ff0055; } 
+                                            33% { background-position: 100% 50%; box-shadow: 0 0 10px #0055ff; }
+                                            66% { background-position: 50% 100%; box-shadow: 0 0 10px #ffaa00; }
+                                            100% { background-position: 0% 50%; box-shadow: 0 0 10px #ff0055; }
+                                        }
+                                        
+                                        @keyframes akiHexAnim {
+                                            from { background-position: 0 0; }
+                                            to { background-position: 300px 300px; }
+                                        }
+
+                                        body.aki-mode-active #desktop {
+                                            background-image: var(--aki-bg) !important;
+                                            background-size: 100% 100% !important;
+                                        }
+                                        
+                                        body.aki-mode-active #desktop::before {
+                                            content: "";
+                                            position: absolute;
+                                            top: 0; left: 0; right: 0; bottom: 0;
+                                            background-image: url('img/hexagon_grid.png');
+                                            background-size: 300px 300px;
+                                            background-repeat: repeat;
+                                            mix-blend-mode: multiply;
+                                            pointer-events: none;
+                                            animation: akiHexAnim 25s linear infinite;
+                                            z-index: 1;
+                                            opacity: 0.9;
+                                        }
+                                    `;
+                                    document.head.appendChild(style);
+                                }
+                            }
+                        } else if (val === "sind") {
+                            akiBar.remove();
+                            akiEasterEggClicks = 0;
+                            akiBarVisible = false;
+                            
+                            // Disattiva e rimuovi Aki se esiste
+                            const oldAkiBtn = document.getElementById("btn-theme-aki");
+                            if (oldAkiBtn) oldAkiBtn.remove();
+                            if (window._akiInterval) clearInterval(window._akiInterval);
+                            document.body.classList.remove("aki-mode-active");
+
+                            const themesGrid = document.querySelector('.preset-theme-grid');
+                            if (themesGrid && !document.getElementById("btn-theme-sind")) {
+                                const sindBtn = document.createElement('button');
+                                sindBtn.id = "btn-theme-sind";
+                                sindBtn.className = "theme-btn";
+                                sindBtn.innerText = "Sind Mode 🎣";
+                                sindBtn.style.background = "linear-gradient(45deg, #001144, #00aaff)";
+                                sindBtn.style.color = "white";
+                                sindBtn.style.fontWeight = "bold";
+                                sindBtn.style.border = "2px solid #00ffff";
+                                sindBtn.style.animation = "sindBtnAnim 3s infinite";
+                                
+                                sindBtn.addEventListener("click", () => {
+                                    const allBtns = document.querySelectorAll('.preset-theme-grid .theme-btn');
+                                    
+                                    if(document.body.classList.contains("sind-mode-active")) {
+                                        document.querySelector(".preset-theme-grid .theme-btn[data-theme='default']").click(); 
+                                    } else {
+                                        if (window._akiInterval) clearInterval(window._akiInterval);
+                                        document.body.classList.remove("aki-mode-active");
+                                        
+                                        allBtns.forEach(b => b.classList.remove('active'));
+                                        sindBtn.classList.add('active');
+                                        
+                                        document.body.classList.add("sind-mode-active");
+                                        
+                                        // Crea l'acquario completo!
+                                        document.querySelectorAll(".sind-entity").forEach(f => f.remove());
+                                        const desktop = document.getElementById("desktop");
+                                        const fishes = ['img/neon_fish.png', 'img/guppy_fish.png', 'img/neon_tetra.png'];
+                                        
+                                        // 1. Branco di pesci
+                                        for(let i=0; i<12; i++) {
+                                            const fish = document.createElement("div");
+                                            fish.className = "sind-entity sind-fish";
+                                            const img = fishes[Math.floor(Math.random() * fishes.length)];
+                                            fish.style.backgroundImage = `url('${img}')`;
+                                            
+                                            let size = 100 + Math.random() * 100;
+                                            if (img.includes("tetra")) size = 50 + Math.random() * 40;
+                                            fish.style.width = `${size}px`;
+                                            fish.style.height = `${size * 0.7}px`;
+                                            fish.style.top = `${10 + Math.random() * 80}%`;
+                                            
+                                            const duration = 15 + Math.random() * 25;
+                                            const delay = -(Math.random() * 30); 
+                                            const dir = Math.random() > 0.5 ? "swimRight" : "swimLeft";
+                                            
+                                            fish.style.animation = `${dir} ${duration}s ease-in-out ${delay}s infinite`;
+                                            fish.style.opacity = 0.6 + Math.random() * 0.4;
+                                            desktop.appendChild(fish);
+                                        }
+                                        
+                                        // 2. Bolle d'aria
+                                        for(let i=0; i<35; i++) {
+                                            const bubble = document.createElement("div");
+                                            bubble.className = "sind-entity sind-bubble";
+                                            const size = 4 + Math.random() * 12;
+                                            bubble.style.width = `${size}px`;
+                                            bubble.style.height = `${size}px`;
+                                            bubble.style.left = `${Math.random() * 100}%`;
+                                            
+                                            const duration = 6 + Math.random() * 8;
+                                            const delay = -(Math.random() * 15);
+                                            bubble.style.animation = `bubbleRise ${duration}s ease-in ${delay}s infinite`;
+                                            desktop.appendChild(bubble);
+                                        }
+                                        
+                                        // 3. Pioggia e increspature in alto
+                                        for(let i=0; i<20; i++) {
+                                            const ripple = document.createElement("div");
+                                            ripple.className = "sind-entity sind-ripple";
+                                            ripple.style.left = `${Math.random() * 100}%`;
+                                            ripple.style.top = `${Math.random() * 20}%`;
+                                            
+                                            const duration = 2 + Math.random() * 4;
+                                            const delay = -(Math.random() * 6);
+                                            ripple.style.animation = `rippleEffect ${duration}s linear ${delay}s infinite`;
+                                            desktop.appendChild(ripple);
+                                        }
+                                    }
+                                });
+                                themesGrid.appendChild(sindBtn);
+
+                                if(!document.getElementById("sind-css-anim")) {
+                                    const style = document.createElement('style');
+                                    style.id = "sind-css-anim";
+                                    style.innerHTML = `
+                                        @keyframes sindBtnAnim { 
+                                            0% { box-shadow: 0 0 8px #00aaff; } 
+                                            50% { box-shadow: 0 0 18px #00ffff; }
+                                            100% { box-shadow: 0 0 8px #00aaff; }
+                                        }
+                                        
+                                        @keyframes sindBgAnim {
+                                            from { background-position: 0 0; }
+                                            to { background-position: -400px 400px; }
+                                        }
+
+                                        body.sind-mode-active #desktop {
+                                            background-image: url('img/sind_bg.png') !important;
+                                            background-size: 250px 250px !important;
+                                            background-repeat: repeat !important;
+                                            background-color: #00122e !important;
+                                            background-blend-mode: multiply !important;
+                                            animation: sindBgAnim 30s linear infinite !important;
+                                        }
+                                        
+                                        body.sind-mode-active .app-header,
+                                        body.sind-mode-active #top-bar,
+                                        body.sind-mode-active .window-panel,
+                                        body.sind-mode-active .timeline-compact {
+                                            background: rgba(0, 15, 40, 0.8) !important;
+                                            backdrop-filter: blur(5px) !important;
+                                            -webkit-backdrop-filter: blur(5px) !important;
+                                            border-color: rgba(0, 255, 255, 0.3) !important;
+                                            box-shadow: inset 0 0 20px rgba(0,255,255,0.05) !important;
+                                        }
+
+                                        body.sind-mode-active {
+                                            --text-main: #cce5ff !important;
+                                            --text-secondary: #70a1ff !important;
+                                            --accent-color: #ff6a00 !important;
+                                            --accent-color-rgb: 255, 106, 0 !important;
+                                            --border-window: #ff6a00 !important;
+                                        }
+                                        
+                                        body.sind-mode-active .btn-accent {
+                                            background: linear-gradient(135deg, #ff4500, #ff8c00) !important;
+                                            border: none !important;
+                                            color: #fff !important;
+                                        }
+                                        
+                                        .sind-fish {
+                                            position: absolute;
+                                            background-size: contain;
+                                            background-repeat: no-repeat;
+                                            background-position: center;
+                                            mix-blend-mode: screen; 
+                                            pointer-events: none; 
+                                            z-index: 1; 
+                                        }
+                                        
+                                        .sind-bubble {
+                                            position: absolute;
+                                            bottom: -20px;
+                                            border: 1px solid rgba(255, 255, 255, 0.4);
+                                            border-radius: 50%;
+                                            pointer-events: none;
+                                            z-index: 5;
+                                        }
+                                        
+                                        .sind-ripple {
+                                            position: absolute;
+                                            border: 2px solid rgba(255, 255, 255, 0.2);
+                                            border-radius: 50%;
+                                            width: 40px;
+                                            height: 40px;
+                                            transform: scale(0) rotateX(70deg);
+                                            pointer-events: none;
+                                            z-index: 10;
+                                        }
+
+                                        /* Caustiche e Squalo Balena Gigante (Tramite pseudo-elementi del desktop) */
+                                        body.sind-mode-active #desktop::before,
+                                        body.sind-mode-active #desktop::after {
+                                            content: "";
+                                            position: absolute;
+                                            top: 0; left: 0; right: 0; bottom: 0;
+                                            pointer-events: none;
+                                        }
+                                        
+                                        /* Raggi solari sott'acqua che illuminano pure i vetri dell'app! */
+                                        body.sind-mode-active #desktop::before {
+                                            background-image: url('img/light_caustics.png');
+                                            background-size: 400px 400px;
+                                            background-repeat: repeat;
+                                            mix-blend-mode: color-dodge; /* Effetto luce estremo */
+                                            opacity: 0.15;
+                                            z-index: 9999; /* Sta SPRA tutte le finestre dell'app! */
+                                            animation: causticsAnim 20s linear infinite;
+                                        }
+                                        
+                                        /* Squalo Balena (Boss) sullo sfondo abissale */
+                                        body.sind-mode-active #desktop::after {
+                                            background-image: url('img/whale_shark.png');
+                                            background-size: 1000px;
+                                            background-repeat: no-repeat;
+                                            mix-blend-mode: screen;
+                                            opacity: 0.12; /* Lontanissimo in profondità */
+                                            z-index: 0; /* Dietro ai pesciolini */
+                                            animation: sharkSwim 80s linear infinite;
+                                        }
+
+                                        @keyframes swimRight {
+                                            0% { left: -300px; transform: translateY(0px) scaleX(1); }
+                                            30% { transform: translateY(-40px) scaleX(1); }
+                                            70% { transform: translateY(30px) scaleX(1); }
+                                            100% { left: 110vw; transform: translateY(-10px) scaleX(1); }
+                                        }
+
+                                        @keyframes swimLeft {
+                                            0% { right: -300px; transform: translateY(0px) scaleX(-1); } 
+                                            40% { transform: translateY(50px) scaleX(-1); }
+                                            80% { transform: translateY(-20px) scaleX(-1); }
+                                            100% { right: 110vw; transform: translateY(30px) scaleX(-1); }
+                                        }
+                                        
+                                        @keyframes bubbleRise {
+                                            0% { transform: translateY(0) scale(1); opacity: 0; }
+                                            10% { opacity: 1; }
+                                            100% { transform: translateY(-110vh) scale(1.5); opacity: 0; }
+                                        }
+                                        
+                                        @keyframes rippleEffect {
+                                            0% { transform: scale(0) rotateX(70deg); opacity: 0.8; }
+                                            100% { transform: scale(3) rotateX(70deg); opacity: 0; }
+                                        }
+                                        
+                                        @keyframes causticsAnim {
+                                            from { background-position: 0 0; }
+                                            to { background-position: -400px 400px; }
+                                        }
+                                        
+                                        @keyframes sharkSwim {
+                                            0% { background-position: 150vw 50%; }
+                                            100% { background-position: -80vw 60%; }
+                                        }
+                                    `;
+                                    document.head.appendChild(style);
+                                }
+                            }
+                        } else {
+                            akiBar.remove();
+                            akiEasterEggClicks = 0;
+                            akiBarVisible = false;
+                        }
+                    });
+                    
+                    return; // Ferma il click qui per evitare che il tooltip venga mostrato
+                }
+            } else {
+                akiEasterEggClicks = 0;
+            }
 
             while (currentElement && currentElement !== document.body) {
                 let id = currentElement.id;
