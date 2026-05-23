@@ -1,6 +1,6 @@
 [Setup]
 AppName=Gif Studio
-AppVersion=1.0
+AppVersion=1.0.19
 DefaultDirName={pf}\Gif Studio
 DefaultGroupName=Gif Studio
 OutputBaseFilename=GifStudio_Setup
@@ -14,11 +14,13 @@ DisableReadyPage=yes
 ; Icona del setup stesso
 SetupIconFile=icon.ico
 
+
 [Files]
 ; Include the native Electron folder and public certificate
-Source: "dist\Gif Studio-win32-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "Applicazione_Portable\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "gifstudio-public.cer"; DestDir: "{app}"; Flags: ignoreversion
 Source: "icon.ico"; DestDir: "{app}"; Flags: ignoreversion
+
 
 [Icons]
 Name: "{autodesktop}\Gif Studio"; Filename: "{app}\Gif Studio.exe"; IconFilename: "{app}\icon.ico"
