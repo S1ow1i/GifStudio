@@ -359,6 +359,15 @@
                                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3zM13 13l6 6"/></svg>
                                     <span>Sposta Oggetto</span>
                                 </button>
+                                                                <button id="draw-tool-lasso" class="tool-btn" title="Seleziona una porzione libera o rettangolare">
+                                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M12 21.5c-4.4 0-8-3.6-8-8 0-4.4 3.6-8 8-8s8 3.6 8 8"/>
+                                        <path d="M12 13.5v8"/>
+                                        <path d="M15.5 21l-3.5-3.5-3.5 3.5"/>
+                                        <circle cx="12" cy="3.5" r="2" stroke-dasharray="2 2"/>
+                                    </svg>
+                                    <span>Selezione Taglio</span>
+                                </button>
                                 <button id="draw-tool-brush" class="tool-btn" title="Disegna pixel a mano libera">
                                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                                     <span>Pennello Disegno</span>
@@ -375,9 +384,18 @@
                                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
                                     <span>Aggiungi Scritta</span>
                                 </button>
-                                <button id="draw-tool-magic-wand" class="tool-btn" title="Crea una maschera di protezione intelligente">
-                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 21.5l14-14M15 3h1m-1 2h1M5 9h1m-1 2h1M20 18h1m-1 2h1M18 9l1-1M19 12l1-1M9 18l1-1M12 19l1-1M14 6l3 3"/></svg>
+                                                                <button id="draw-tool-magic-wand" class="tool-btn" title="Crea una maschera di protezione intelligente">
+                                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/>
+                                        <line x1="16" y1="8" x2="2" y2="22"/>
+                                        <line x1="17.5" y1="15" x2="19" y2="16.5"/>
+                                        <line x1="22" y1="9.5" x2="20.5" y2="8"/>
+                                    </svg>
                                     <span>Bacchetta Magica</span>
+                                </button>
+                                <button id="draw-tool-shapes" class="tool-btn" title="Disegna rettangoli, cerchi o linee">
+                                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><circle cx="16.5" cy="6.5" r="3.5"></circle><path d="M4 15l4 6h-8z"></path><line x1="14" y1="18" x2="21" y2="18"></line><line x1="17.5" y1="14.5" x2="17.5" y2="21.5"></line></svg>
+                                    <span>Forme Geomet.</span>
                                 </button>
                             </div>
                         </div>
@@ -392,6 +410,18 @@
                             <button id="btn-remove-protection-mask" class="danger-btn" style="width: 100%; padding: 8px; border-radius: 6px; cursor: pointer; border: 1px solid var(--danger-color); background: rgba(255,59,48,0.1); color: var(--danger-color); display: flex; justify-content: center; align-items: center; gap: 8px;">
                                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
                                 Rimuovi Maschera
+                            </button>
+                        </div>
+                        
+                        <!-- Opzioni Lasso -->
+                        <div class="control-group" id="lasso-settings-group" style="display: none;">
+                            <button id="btn-lasso-cut" class="primary-btn" style="width: 100%; padding: 10px; border-radius: 6px; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
+                                Ritaglia ed Estrai Livello
+                            </button>
+                            <button id="btn-lasso-clear" class="danger-btn" style="width: 100%; padding: 10px; border-radius: 6px; cursor: pointer; border: 1px solid var(--danger-color); background: rgba(255,59,48,0.1); color: var(--danger-color); display: flex; justify-content: center; align-items: center; gap: 8px;">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                Pulisci Area (Taglia Solco)
                             </button>
                         </div>
 
@@ -426,6 +456,50 @@
                             </div>
                         </div>
                     </div>
+                        <!-- Opzioni Forme -->
+                        <div class="control-group" id="shapes-settings-group" style="display: none;">
+                            <label id="tut-title-shapes-settings">Impostazioni Forme</label>
+                            <div class="input-row props-grid-3" style="margin-bottom: 12px;">
+                                <button type="button" id="shape-type-rect" class="mode-btn active" title="Rettangolo">Rettangolo</button>
+                                <button type="button" id="shape-type-circle" class="mode-btn" title="Cerchio">Cerchio</button>
+                                <button type="button" id="shape-type-line" class="mode-btn" title="Linea">Linea</button>
+                            </div>
+                            <div class="input-row props-grid-2">
+                                <div class="input-field">
+                                    <span>Bordo px:</span>
+                                    <input type="number" id="shape-stroke-width" value="2" min="0" max="100">
+                                </div>
+                                <div class="input-field" style="border-left: 2px solid var(--bg-hover);">
+                                    <input type="color" id="shape-stroke-color" value="#00ffcc" style="width: 100%; cursor: pointer;">
+                                </div>
+                            </div>
+                            <div class="input-row props-grid-2" style="margin-top: 8px;">
+                                <div class="input-field" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                                    <input type="checkbox" id="shape-fill-enabled" style="width: 16px; height: 16px; cursor: pointer;">
+                                    <span>Riempimento</span>
+                                </div>
+                                <div class="input-field" style="border-left: 2px solid var(--bg-hover);">
+                                    <input type="color" id="shape-fill-color" value="#ffffff" style="width: 100%; cursor: pointer; opacity: 0.3;" disabled>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Opzioni Lasso -->
+                        <div class="control-group" id="lasso-settings-group" style="display: none;">
+                            <label id="tut-title-lasso-settings">Impostazioni Lazo</label>
+                            <div class="input-row props-grid-2" style="margin-bottom: 12px;">
+                                <button type="button" id="lasso-mode-free" class="mode-btn active" title="Seleziona un'area libera a mano libera">A Mano Libera</button>
+                                <button type="button" id="lasso-mode-rect" class="mode-btn" title="Seleziona un'area quadrata/rettangolare">Rettangolare</button>
+                            </div>
+                            
+                            <button id="btn-lasso-cut" class="primary-btn" style="width: 100%; padding: 10px; border-radius: 6px; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
+                                Ritaglia ed Estrai Livello
+                            </button>
+                            <button id="btn-lasso-clear" class="danger-btn" style="width: 100%; padding: 10px; border-radius: 6px; cursor: pointer; border: 1px solid var(--danger-color); background: rgba(255,59,48,0.1); color: var(--danger-color); display: flex; justify-content: center; align-items: center; gap: 8px;">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                Pulisci Area (Taglia Solco)
+                            </button>
+                        </div>
 
                     
                     <!-- Tab 4: Posizione XYZ (Spostato sotto Proprietà e Filtri) -->

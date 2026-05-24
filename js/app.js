@@ -3114,6 +3114,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Disabilitazione intelligente dei tab Filtri e Colori per i livelli di Riferimento Bloccati
         const filtersTabs = document.querySelectorAll("#win-properties .window-tabs-header [data-tab='tab-prop-bg'], #win-properties .window-tabs-header [data-tab='tab-prop-colors']");
+                if (state.activeTool === "shapes") {
+            state.shapes.isDrawing = true;
+            state.shapes.startX = coords.x;
+            state.shapes.startY = coords.y;
+            state.shapes.currentX = coords.x;
+            state.shapes.currentY = coords.y;
+            requestRender();
+            return;
+        }
+        if (state.activeTool === "lasso") {
+            state.lasso.isDrawing = true;
+            state.lasso.hasSelection = false;
+            state.lasso.points = [{ x: coords.x, y: coords.y }];
+            state.lasso.startX = coords.x;
+            state.lasso.startY = coords.y;
+            state.lasso.currentX = coords.x;
+            state.lasso.currentY = coords.y;
+            requestRender();
+            return;
+        }
+
         if (layer.locked) {
             filtersTabs.forEach(tab => {
                 tab.style.opacity = "0.3";
@@ -4029,10 +4050,16 @@ document.addEventListener("DOMContentLoaded", () => {
                     dom.eraserModeGroup.style.display = "block";
                 } else {
                     dom.eraserModeGroup.style.display = "none";
+            dom.shapesSettingsGroup.style.display = "none";
+            dom.lassoSettingsGroup.style.display = "none";
                 }
 
                 if (t.name === "magic_wand") {
                     dom.magicWandSettingsGroup.style.display = "block";
+                } else if (state.activeTool === "shapes") {
+                    dom.shapesSettingsGroup.style.display = "block";
+                } else if (state.activeTool === "lasso") {
+                    dom.lassoSettingsGroup.style.display = "block";
                 } else {
                     dom.magicWandSettingsGroup.style.display = "none";
                 }
@@ -4236,6 +4263,24 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function drawMove(e) {
+                if (state.activeTool === "shapes" && state.shapes.isDrawing) {
+            const coords = getCoordsOnCanvas(e);
+            state.shapes.currentX = coords.x;
+            state.shapes.currentY = coords.y;
+            requestRender();
+            return;
+        }
+        if (state.activeTool === "lasso" && state.lasso.isDrawing) {
+            const coords = getCoordsOnCanvas(e);
+            state.lasso.currentX = coords.x;
+            state.lasso.currentY = coords.y;
+            if (state.lasso.mode === "free") {
+                state.lasso.points.push({ x: coords.x, y: coords.y });
+            }
+            requestRender();
+            return;
+        }
+
         if (!state.brush.isDrawing) return;
         const layer = getActiveLayer();
         if (!layer || layer.locked || !layer.drawingCanvas) return;
@@ -4250,6 +4295,96 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function stopDrawing() {
+        if (state.activeTool === "shapes" && state.shapes.isDrawing) {
+            state.shapes.isDrawing = false;
+            const sx = state.shapes.startX;
+            const sy = state.shapes.startY;
+            const ex = state.shapes.currentX;
+            const ey = state.shapes.currentY;
+
+            if (Math.abs(ex - sx) < 3 && Math.abs(ey - sy) < 3) {
+                requestRender();
+                return;
+            }
+
+            const minX = Math.min(sx, ex);
+            const minY = Math.min(sy, ey);
+            const w = Math.abs(ex - sx) || 4;
+            const h = Math.abs(ey - sy) || 4;
+
+            const shapeCanvas = document.createElement("canvas");
+            const pad = state.shapes.strokeWidth;
+            shapeCanvas.width = w + pad * 2;
+            shapeCanvas.height = h + pad * 2;
+            const sCtx = shapeCanvas.getContext("2d");
+
+            sCtx.strokeStyle = state.shapes.strokeColor;
+            sCtx.lineWidth = pad;
+            if (state.shapes.fillEnabled) sCtx.fillStyle = state.shapes.fillColor;
+
+            sCtx.beginPath();
+            if (state.shapes.type === "rect") {
+                if (state.shapes.fillEnabled) sCtx.fillRect(pad, pad, w, h);
+                if (pad > 0) sCtx.strokeRect(pad, pad, w, h);
+            } else if (state.shapes.type === "circle") {
+                const rx = w / 2;
+                const ry = h / 2;
+                sCtx.ellipse(pad + rx, pad + ry, rx, ry, 0, 0, Math.PI * 2);
+                if (state.shapes.fillEnabled) sCtx.fill();
+                if (pad > 0) sCtx.stroke();
+            } else if (state.shapes.type === "line") {
+                const startX = (sx < ex) ? pad : pad + w;
+                const startY = (sy < ey) ? pad : pad + h;
+                const endX = (ex < sx) ? pad : pad + w;
+                const endY = (ey < sy) ? pad : pad + h;
+                sCtx.moveTo(startX, startY);
+                sCtx.lineTo(endX, endY);
+                if (pad > 0) sCtx.stroke();
+            }
+
+            saveState();
+            const newLayer = {
+                id: generateId(),
+                type: "image",
+                visible: true,
+                locked: false,
+                opacity: 1,
+                x: minX - pad,
+                y: minY - pad,
+                w: shapeCanvas.width,
+                h: shapeCanvas.height,
+                r: 0,
+                canvasImage: shapeCanvas,
+                name: `Forma (${state.shapes.type})`
+            };
+
+            const frame = getActiveFrame();
+            if (frame) {
+                frame.layers.push(newLayer);
+                state.activeLayerId = newLayer.id;
+            }
+
+            requestRender();
+            if (typeof renderLayers === "function") renderLayers();
+            return;
+        }
+
+        if (state.activeTool === "lasso" && state.lasso.isDrawing) {
+            state.lasso.isDrawing = false;
+            state.lasso.hasSelection = true;
+            if (state.lasso.mode === "rect") {
+                const sx = state.lasso.startX;
+                const sy = state.lasso.startY;
+                const ex = state.lasso.currentX;
+                const ey = state.lasso.currentY;
+                state.lasso.points = [
+                    { x: sx, y: sy }, { x: ex, y: sy },
+                    { x: ex, y: ey }, { x: sx, y: ey }
+                ];
+            }
+            requestRender();
+            return;
+        }
         state.brush.isDrawing = false;
     }
 
@@ -4842,14 +4977,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     type: "image",
                     x: 0,
                     y: 0,
-                    w: state.canvasWidth,
-                    h: state.canvasHeight,
-                    visible: true,
-                    opacity: 0.7,
-                    r: 0,
-                    keepRatio: true,
-                    aspectRatio: 1,
-                    img: null,
+                    w: state.canvasWidth, h: state.canvasHeight, visible: true, opacity: 0.7, r: 0, keepRatio: true, aspectRatio: 1, img: null,
                     borderRadius: 0,
                     locked: true,
                     isReference: true,
@@ -4893,10 +5021,10 @@ document.addEventListener("DOMContentLoaded", () => {
                         groupId: sharedGroupId,
                         name: "Rif: " + file.name.substring(0, 12),
                         type: "image",
-                        x: Math.round((state.canvasWidth - img.width) / 2),
-                        y: Math.round((state.canvasHeight - img.height) / 2),
-                        w: img.width,
-                        h: img.height,
+                        x: Math.round((state.canvasWidth - (img.width * Math.min(state.canvasWidth / img.width, state.canvasHeight / img.height, 1))) / 2),
+                        y: Math.round((state.canvasHeight - (img.height * Math.min(state.canvasWidth / img.width, state.canvasHeight / img.height, 1))) / 2),
+                        w: Math.round(img.width * Math.min(state.canvasWidth / img.width, state.canvasHeight / img.height, 1)),
+                        h: Math.round(img.height * Math.min(state.canvasWidth / img.width, state.canvasHeight / img.height, 1)),
                         visible: true,
                         opacity: 0.7, // Opacità 70% di default per ricalco
                         r: 0,
@@ -7294,6 +7422,8 @@ document.addEventListener("DOMContentLoaded", () => {
             "tut-title-bg-transparent": "Trasparenza Colore: Clicca su un colore dell'immagine per bucarlo come fosse un green-screen.",
             "tut-title-bg-auto": "Trasparenza Automatica: Cerca di rimuovere in automatico lo sfondo esterno attorno all'immagine.",
             "tut-title-replace-color": "Sostituisci Colore: Trasforma magicamente tutti i pixel di un certo colore in un altro colore in tutta la GIF.",
+            "tut-title-shapes-settings": "Impostazioni Forme: Permette di scegliere il tipo di forma, colore, spessore e riempimento.",
+            "tut-title-lasso-settings": "Impostazioni Lazo: Scegli tra selezione libera o rettangolare e ritaglia l'immagine.",
             
             // TAVOLA DA DISEGNO
             "btn-zoom-out": "Riduci: Rimpicciolisce la vista della tavola da disegno per farti vedere il quadro generale.",  
