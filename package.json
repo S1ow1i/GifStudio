@@ -1,13 +1,24 @@
 {
   "name": "gif-studio",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Gif Studio - Modifica Foto e GIF Premium (Portable)",
   "main": "main.js",
   "scripts": {
+    "dev": "concurrently \"vite\" \"cross-env NODE_ENV=development electron .\"",
+    "build": "vite build",
+    "test": "vitest run",
+    "test:ui": "vitest --ui",
     "build-portable": "compila_exe.bat"
   },
   "devDependencies": {
+    "@types/node": "^25.9.1",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
     "electron": "^31.0.0",
-    "electron-packager": "^17.1.2"
+    "electron-packager": "^17.1.2",
+    "jsdom": "^29.1.1",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.14",
+    "vitest": "^4.1.7"
   }
 }

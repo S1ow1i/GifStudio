@@ -1,9 +1,16 @@
+import { brushTool } from './tools/BrushTool.js';
+import { eraserTool } from './tools/EraserTool.js';
+import { selectTool } from './tools/SelectTool.js';
+import { colorPickerTool } from './tools/ColorPickerTool.js';
 import { generateId } from './core/Utils.js';
 import { state } from './core/State.js';
 import { dom } from './core/DOM.js';
 import { shapesTool } from './tools/ShapesTool.js';
 import { lassoTool } from './tools/LassoTool.js';
 import { magicWandTool } from './tools/MagicWandTool.js';
+import { timelinePanel } from './panels/TimelinePanel.js';
+import { layerPanel } from './panels/LayerPanel.js';
+import { propertiesPanel } from './panels/PropertiesPanel.js';
 
 /* ==========================================================================
    GIF STUDIO - LOGICA APPLICAZIONE & FUNZIONALITÀ INTERFACCIA
@@ -3779,15 +3786,9 @@ document.addEventListener("DOMContentLoaded", () => {
         ctx.lineWidth = 0.8 / state.zoom;
         
         const minDim = Math.min(state.canvasWidth, state.canvasHeight);
-        let gridSize = 40;
-        if (minDim <= 32) gridSize = 1;
-        else if (minDim <= 64) gridSize = 2;
-        else if (minDim <= 128) gridSize = 4;
-        else if (minDim <= 256) gridSize = 8;
-        else if (minDim <= 512) gridSize = 16;
-        else if (minDim <= 1024) gridSize = 32;
-        else if (minDim <= 2048) gridSize = 64;
-        else gridSize = 128;
+        let gridSize = 20;
+        if (minDim <= 64) gridSize = 10;
+        else if (minDim >= 1000) gridSize = 40;
         
         for (let x = 0; x < state.canvasWidth; x += gridSize) {
             ctx.beginPath();
@@ -4108,93 +4109,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function startDrawing(e) {
         if (state.activeTool === "select") {
-            handleCanvasSelect(e);
-            return;
-        }
-
-        const layer = getActiveLayer();
-        if (!layer) return;
-
-        const coords = getCoordsOnCanvas(e);
-
-        // LOGICA STRUMENTO PIPETTA E SMISTAMENTO COLORE
-        if (state.activeTool === "picker") {
-            const pixel = ctx.getImageData(coords.x, coords.y, 1, 1).data;
-            const hex = rgbToHex(pixel[0], pixel[1], pixel[2]);
-            
-            if (state.colorPickerTarget === "brush") {
-                state.brush.color = hex;
-                if (dom.brushColor) dom.brushColor.value = hex;
-            } else if (state.colorPickerTarget === "chroma") {
-                if (dom.chromaColor) dom.chromaColor.value = hex;
-                if (layer) {
-                    saveState();
-                    layer.chromaColor = hex;
-                    filterCache.delete(layer.id);
-                }
-            } else if (state.colorPickerTarget === "replace-from") {
-                if (dom.replaceColorFrom) dom.replaceColorFrom.value = hex;
-                const localCoords = mapGlobalToLayerCoords(coords.x, coords.y, layer);
-                state.lastPickedReplaceCoords = { x: localCoords.x, y: localCoords.y };
-            } else if (state.colorPickerTarget === "replace-to") {
-                if (dom.replaceColorTo) dom.replaceColorTo.value = hex;
-            } else if (state.colorPickerTarget === "bg-remove") {
-                if (dom.bgRemoveColor) dom.bgRemoveColor.value = hex;
-                if (layer) {
-                    const localCoords = mapGlobalToLayerCoords(coords.x, coords.y, layer);
-                    layer.bgRemoveSeedX = localCoords.x;
-                    layer.bgRemoveSeedY = localCoords.y;
-                    layer.bgRemoveColor = hex;
-                    layer.bgRemoveActive = true;
-                    if (dom.bgRemoveActive) dom.bgRemoveActive.checked = true;
-                    state.lastPickedTransparencyCoords = { x: localCoords.x, y: localCoords.y };
-                    
-                    propagateLayerChanges(layer, {
-                        bgRemoveSeedX: layer.bgRemoveSeedX,
-                        bgRemoveSeedY: layer.bgRemoveSeedY,
-                        bgRemoveColor: layer.bgRemoveColor,
-                        bgRemoveActive: layer.bgRemoveActive
-                    });
-                    
-                    filterCache.delete(layer.id);
-                }
-            } else if (state.colorPickerTarget === "bg-transparent-pick") {
-                if (dom.bgTransparentColor) dom.bgTransparentColor.value = hex;
-                if (layer) {
-                    const localCoords = mapGlobalToLayerCoords(coords.x, coords.y, layer);
-                    state.lastPickedTransparencyCoords = { x: localCoords.x, y: localCoords.y };
-                    updateTransparentPickStatus();
-                }
-            } else if (state.colorPickerTarget === "chain-erase") {
-                const localCoords = mapGlobalToLayerCoords(coords.x, coords.y, layer);
-                state.colorReplacements.push({
-                    type: "chain-erase",
-                    seedX: localCoords.x,
-                    seedY: localCoords.y
-                });
-                if (typeof updateReplacementsUI === "function") updateReplacementsUI();
-                filterCache.clear();
-            }
-            
-            // Disattiva la pulsazione delle pipette
-            document.querySelectorAll(".pipette-btn").forEach(btn => btn.classList.remove("pulse-pipette"));
-            
-            // Ripristina lo strumento attivo precedente (select o brush)
-            let prevToolBtn = dom.drawSelect;
-            let prevToolName = "select";
-            if (state.lastActiveToolBeforePicker && state.lastActiveToolBeforePicker !== "picker") {
-                prevToolName = state.lastActiveToolBeforePicker;
-                if (prevToolName === "brush") prevToolBtn = dom.drawBrush;
-                else if (prevToolName === "eraser") prevToolBtn = dom.drawEraser;
-            }
-            
-            if (prevToolBtn) {
-                prevToolBtn.click();
-            } else {
-                dom.drawSelect.click();
-            }
-            
-            requestRender();
+            selectTool.onMouseMove(coords, layer, requestRender);
             return;
         }
 
@@ -4273,6 +4188,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function stopDrawing() {
+        brushTool.onMouseUp();
+        eraserTool.onMouseUp();
+        selectTool.onMouseUp();
         if (state.activeTool === "shapes" && state.shapes.isDrawing) {
             state.shapes.isDrawing = false;
             const sx = state.shapes.startX;

@@ -329,8 +329,14 @@ function createWindow() {
         }
     });
 
-    // Carica la pagina tramite il server HTTP locale (necessario per mantenere contesti sicuri per le API di File System)
-    const startUrl = isTestMode ? `http://localhost:${PORT}/index.html?test=true` : `http://localhost:${PORT}/index.html`;
+    // Carica la pagina tramite il server HTTP locale o tramite Vite in sviluppo
+    const isDev = process.env.NODE_ENV === 'development';
+    let startUrl = isTestMode ? `http://localhost:${PORT}/index.html?test=true` : `http://localhost:${PORT}/index.html`;
+    
+    if (isDev) {
+        startUrl = 'http://localhost:5173/';
+    }
+    
     mainWindow.loadURL(startUrl);
 
     mainWindow.on('closed', () => {
