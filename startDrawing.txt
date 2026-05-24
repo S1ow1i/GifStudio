@@ -1,0 +1,142 @@
+function startDrawing(e) {
+        if (state.activeTool === "select") {
+            handleCanvasSelect(e);
+            return;
+        }
+
+        const layer = getActiveLayer();
+        if (!layer) return;
+
+        const coords = getCoordsOnCanvas(e);
+
+        // LOGICA STRUMENTO PIPETTA E SMISTAMENTO COLORE
+        if (state.activeTool === "picker") {
+            const pixel = ctx.getImageData(coords.x, coords.y, 1, 1).data;
+            const hex = rgbToHex(pixel[0], pixel[1], pixel[2]);
+            
+            if (state.colorPickerTarget === "brush") {
+                state.brush.color = hex;
+                if (dom.brushColor) dom.brushColor.value = hex;
+            } else if (state.colorPickerTarget === "chroma") {
+                if (dom.chromaColor) dom.chromaColor.value = hex;
+                if (layer) {
+                    saveState();
+                    layer.chromaColor = hex;
+                    filterCache.delete(layer.id);
+                }
+            } else if (state.colorPickerTarget === "replace-from") {
+                if (dom.replaceColorFrom) dom.replaceColorFrom.value = hex;
+                const localCoords = mapGlobalToLayerCoords(coords.x, coords.y, layer);
+                state.lastPickedReplaceCoords = { x: localCoords.x, y: localCoords.y };
+            } else if (state.colorPickerTarget === "replace-to") {
+                if (dom.replaceColorTo) dom.replaceColorTo.value = hex;
+            } else if (state.colorPickerTarget === "bg-remove") {
+                if (dom.bgRemoveColor) dom.bgRemoveColor.value = hex;
+                if (layer) {
+                    const localCoords = mapGlobalToLayerCoords(coords.x, coords.y, layer);
+                    layer.bgRemoveSeedX = localCoords.x;
+                    layer.bgRemoveSeedY = localCoords.y;
+                    layer.bgRemoveColor = hex;
+                    layer.bgRemoveActive = true;
+                    if (dom.bgRemoveActive) dom.bgRemoveActive.checked = true;
+                    state.lastPickedTransparencyCoords = { x: localCoords.x, y: localCoords.y };
+                    
+                    propagateLayerChanges(layer, {
+                        bgRemoveSeedX: layer.bgRemoveSeedX,
+                        bgRemoveSeedY: layer.bgRemoveSeedY,
+                        bgRemoveColor: layer.bgRemoveColor,
+                        bgRemoveActive: layer.bgRemoveActive
+                    });
+                    
+                    filterCache.delete(layer.id);
+                }
+            } else if (state.colorPickerTarget === "bg-transparent-pick") {
+                if (dom.bgTransparentColor) dom.bgTransparentColor.value = hex;
+                if (layer) {
+                    const localCoords = mapGlobalToLayerCoords(coords.x, coords.y, layer);
+                    state.lastPickedTransparencyCoords = { x: localCoords.x, y: localCoords.y };
+                    updateTransparentPickStatus();
+                }
+            } else if (state.colorPickerTarget === "chain-erase") {
+                const localCoords = mapGlobalToLayerCoords(coords.x, coords.y, layer);
+                state.colorReplacements.push({
+                    type: "chain-erase",
+                    seedX: localCoords.x,
+                    seedY: localCoords.y
+                });
+                if (typeof updateReplacementsUI === "function") updateReplacementsUI();
+                filterCache.clear();
+            }
+            
+            // Disattiva la pulsazione delle pipette
+            document.querySelectorAll(".pipette-btn").forEach(btn => btn.classList.remove("pulse-pipette"));
+            
+            // Ripristina lo strumento attivo precedente (select o brush)
+            let prevToolBtn = dom.drawSelect;
+            let prevToolName = "select";
+            if (state.lastActiveToolBeforePicker && state.lastActiveToolBeforePicker !== "picker") {
+                prevToolName = state.lastActiveToolBeforePicker;
+                if (prevToolName === "brush") prevToolBtn = dom.drawBrush;
+                else if (prevToolName === "eraser") prevToolBtn = dom.drawEraser;
+            }
+            
+            if (prevToolBtn) {
+                prevToolBtn.click();
+            } else {
+                dom.drawSelect.click();
+            }
+            
+            requestRender();
+            return;
+        }
+
+        if (state.activeTool === "magic_wand") {
+            const localCoords = mapGlobalToLayerCoords(coords.x, coords.y, layer);
+            saveState();
+            applyMagicWand(layer, localCoords.x, localCoords.y);
+            return;
+        }
+
+        if (state.activeTool === "shapes") {
+            state.shapes.isDrawing = true;
+            state.shapes.startX = coords.x;
+            state.shapes.startY = coords.y;
+            state.shapes.currentX = coords.x;
+            state.shapes.currentY = coords.y;
+            requestRender();
+            return;
+        }
+        if (state.activeTool === "lasso") {
+            state.lasso.isDrawing = true;
+            state.lasso.hasSelection = false;
+            state.lasso.points = [{ x: coords.x, y: coords.y }];
+            state.lasso.startX = coords.x;
+            state.lasso.startY = coords.y;
+            state.lasso.currentX = coords.x;
+            state.lasso.currentY = coords.y;
+            requestRender();
+            return;
+        }
+
+        // INIBIZIONE PENNELLO E GOMMA SU LIVELLI BLOCCATI
+        if (layer.locked) {
+            return;
+        }
+
+        if (!layer.drawingCanvas) {
+            layer.drawingCanvas = createDrawingCanvasForLayer(layer.w, layer.h);
+        }
+
+        // Salva lo stato prima di disegnare per permettere l'Undo
+        saveState();
+
+        state.brush.isDrawing = true;
+        
+        const localCoords = mapGlobalToLayerCoords(coords.x, coords.y, layer);
+        state.brush.lastX = localCoords.x;
+        state.brush.lastY = localCoords.y;
+
+        drawPoint(localCoords.x, localCoords.y, layer);
+    }
+
+    function drawMove(e) {

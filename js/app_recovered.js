@@ -1,10 +1,3 @@
-import { generateId } from './core/Utils.js';
-import { state } from './core/State.js';
-import { dom } from './core/DOM.js';
-import { shapesTool } from './tools/ShapesTool.js';
-import { lassoTool } from './tools/LassoTool.js';
-import { magicWandTool } from './tools/MagicWandTool.js';
-
 /* ==========================================================================
    GIF STUDIO - LOGICA APPLICAZIONE & FUNZIONALITÀ INTERFACCIA
    ========================================================================== */
@@ -13,7 +6,60 @@ document.addEventListener("DOMContentLoaded", () => {
     // ======================================================================
     // 1. STATO GLOBALE DELL'APPLICAZIONE
     // ======================================================================
-    
+    const state = {
+        canvasWidth: 800,
+        canvasHeight: 600,
+        zoom: 1.0,
+        gridActive: false,
+        
+        // Sequenza delle immagini GIF
+        frames: [
+            {
+                id: generateId(),
+                delay: 100, // tempo in millisecondi (ms)
+                layers: []  // Livelli presenti in questo specifico fotogramma
+            }
+        ],
+        activeFrameIndex: 0,
+        activeLayerId: null,
+        
+        // Strumento di disegno in uso
+        activeTool: "select", // "select" (sposta), "brush" (pennello), "eraser" (gomma), "picker" (copia colore), "magic_wand"
+        eraserMode: "brush", // "brush" (tratti) o "gif" (pixel sfondo GIF)
+        editScope: "local", // "local" (solo frame corrente) o "global" (tutta la gif)
+        colorReplacements: [], // lista sostituzioni globali
+        magicWandTolerance: 20,
+        protectionMask: null, // Maschera di protezione calcolata dalla bacchetta magica
+        history: {
+            past: [],
+            future: []
+        },
+        brush: {
+            size: 5,
+            color: "#00ffcc",
+            hardness: 100,
+            isDrawing: false,
+            lastX: 0,
+            lastY: 0
+        },
+        
+        // Riproduzione della GIF
+        isPlaying: false,
+        playInterval: null,
+        
+        // Registro delle posizioni e grandezze delle finestre
+        windows: {},
+
+        // Stacks storici per Undo & Redo
+        undoStack: [],
+        redoStack: [],
+        
+        // Target attivo per la pipetta (copia colore)
+        colorPickerTarget: "brush", // "brush", "chroma", "replace-from", "replace-to", "bg-remove", "bg-transparent-pick"
+        lastPickedTransparencyCoords: null,
+        exportDirectoryHandle: null,
+        autoKeyframe: true
+    };
 
     let layoutRestoreComplete = false;
     let lastKnownScreen = { w: window.innerWidth, h: window.innerHeight };
@@ -166,7 +212,150 @@ document.addEventListener("DOMContentLoaded", () => {
     // ======================================================================
     // 2. ELEMENTI DELLA SCHERMATA (DOM)
     // ======================================================================
-    
+    const dom = {
+        desktop: document.getElementById("desktop"),
+        windowContainer: document.getElementById("window-container"),
+        mainCanvas: document.getElementById("main-canvas"),
+        canvasViewport: document.getElementById("canvas-viewport"),
+        scrollContainer: document.getElementById("canvas-scroll-container"),
+        zoomText: document.getElementById("zoom-text"),
+        statusCanvasSize: document.getElementById("status-canvas-size"),
+        statusActiveLayer: document.getElementById("status-active-layer"),
+        statusFramesCount: document.getElementById("status-frames-count"),
+        
+        // Undo e Redo
+        btnUndo: document.getElementById("btn-undo"),
+        btnRedo: document.getElementById("btn-redo"),
+        
+        // Importazione ed Esportazione
+        ioWidth: document.getElementById("io-canvas-width"),
+        ioHeight: document.getElementById("io-canvas-height"),
+        applyCanvasSize: document.getElementById("btn-apply-canvas-size"),
+        fileInput: document.getElementById("file-input"),
+        fileDropzone: document.getElementById("file-dropzone"),
+        exportFormat: document.getElementById("export-format"),
+        exportFile: document.getElementById("btn-export-file"),
+        
+        // Livelli (Layers)
+        layerList: document.getElementById("layer-list"),
+        addTextLayer: document.getElementById("btn-add-text-layer"),
+        deleteLayer: document.getElementById("btn-delete-layer"),
+        
+        // Muovi XYZ
+        xyzX: document.getElementById("xyz-val-x"),
+        xyzY: document.getElementById("xyz-val-y"),
+        xyzZ: document.getElementById("xyz-val-z"),
+        xyzW: document.getElementById("xyz-val-w"),
+        xyzH: document.getElementById("xyz-val-h"),
+        xyzR: document.getElementById("xyz-val-r"),
+        xyzOpacity: document.getElementById("xyz-val-opacity"),
+        xyzKeepRatio: document.getElementById("xyz-keep-ratio"),
+        xyzNoWarning: document.getElementById("xyz-no-layer-warning"),
+        xyzControls: document.getElementById("xyz-controls"),
+        
+        // Gestione scritte di testo
+        xyzTextEditGroup: document.getElementById("xyz-text-edit-group"),
+        xyzTextContent: document.getElementById("xyz-text-content"),
+        xyzTextFont: document.getElementById("xyz-text-font"),
+        xyzTextColor: document.getElementById("xyz-text-color"),
+        xyzTextStartFrame: document.getElementById("xyz-text-start-frame"),
+        xyzTextEndFrame: document.getElementById("xyz-text-end-frame"),
+        
+        // Strumenti Disegno
+        drawSelect: document.getElementById("draw-tool-select"),
+        drawBrush: document.getElementById("draw-tool-brush"),
+        drawEraser: document.getElementById("draw-tool-eraser"),
+        drawPicker: document.getElementById("draw-tool-picker"),
+        drawMagicWand: document.getElementById("draw-tool-magic-wand"),
+        brushSettings: document.getElementById("brush-settings-group"),
+        brushSize: document.getElementById("brush-size"),
+        brushColor: document.getElementById("brush-color"),
+        brushHardness: document.getElementById("brush-hardness"),
+        brushHardnessText: document.getElementById("brush-hardness-text"),
+        
+        // Filtri e Trasparenza Sfondo
+        bgRemoveActive: document.getElementById("bg-remove-active"),
+        bgRemoveColor: document.getElementById("bg-remove-color"),
+        btnPickBgRemoveColor: document.getElementById("btn-pick-bg-remove-color"),
+        bgRemoveTolerance: document.getElementById("bg-remove-tolerance"),
+        bgRemoveToleranceSlider: document.getElementById("bg-remove-tolerance-slider"),
+        bgTransparentColor: document.getElementById("bg-transparent-color"),
+        btnPickTransparentColor: document.getElementById("btn-pick-transparent-color"),
+        bgTransparentTolerance: document.getElementById("bg-transparent-tolerance"),
+        bgTransparentToleranceSlider: document.getElementById("bg-transparent-tolerance-slider"),
+        transparentPickStatus: document.getElementById("transparent-pick-status"),
+        btnAddTransparencyRule: document.getElementById("btn-add-transparency-rule"),
+        transparencyRulesListBox: document.getElementById("transparency-rules-list-box"),
+        bgTransparencyType: document.getElementById("bg-transparency-type"),
+        keyframeTarget: document.getElementById("keyframe-target"),
+        btnAddKeyframe: document.getElementById("btn-add-keyframe"),
+        btnDeleteKeyframe: document.getElementById("btn-delete-keyframe"),
+        kfPropX: document.getElementById("kf-prop-x"),
+        kfPropY: document.getElementById("kf-prop-y"),
+        kfPropZ: document.getElementById("kf-prop-z"),
+        kfPropR: document.getElementById("kf-prop-r"),
+        kfPropOpacity: document.getElementById("kf-prop-opacity"),
+        kfPropW: document.getElementById("kf-prop-w"),
+        kfPropH: document.getElementById("kf-prop-h"),
+        filterBorderRadius: document.getElementById("filter-border-radius"),
+        btnApplyCorners: document.getElementById("btn-apply-corners"),
+        
+        // Timeline e Riproduttore
+        framesTrack: document.getElementById("timeline-frames-box"),
+        keyframesTrackBox: document.getElementById("keyframes-track-box"),
+        kfAutoKeyframe: document.getElementById("kf-auto-keyframe"),
+        btnGotoPrevKeyframe: document.getElementById("btn-goto-prev-keyframe"),
+        btnGotoNextKeyframe: document.getElementById("btn-goto-next-keyframe"),
+        btnPlayGif: document.getElementById("btn-play-gif"),
+        btnPauseGif: document.getElementById("btn-pause-gif"),
+        timelineDelay: document.getElementById("timeline-delay"),
+        btnApplyDelayAll: document.getElementById("btn-apply-delay-all"),
+        btnDuplicateFrame: document.getElementById("btn-duplicate-frame"),
+        btnDeleteFrame: document.getElementById("btn-delete-frame"),
+        btnReverseFrames: document.getElementById("btn-reverse-frames"),
+        timelineSpeed: document.getElementById("timeline-speed-scale"),
+        btnOptimizeGif: document.getElementById("btn-optimize-gif"),
+        
+        // UI Customizer (Temi e Colori)
+        themeDark: document.getElementById("theme-dark"),
+        themeCyber: document.getElementById("theme-cyber"),
+        themeTerminal: document.getElementById("theme-terminal"),
+        themeLight: document.getElementById("theme-light"),
+        uiColorBg: document.getElementById("ui-color-bg"),
+        uiColorWin: document.getElementById("ui-color-win"),
+        uiColorText: document.getElementById("ui-color-text"),
+        uiColorAccent: document.getElementById("ui-color-accent"),
+        uiFontFamily: document.getElementById("ui-font-family"),
+        uiFontSize: document.getElementById("ui-font-size"),
+        uiWindowRadius: document.getElementById("ui-window-radius"),
+        uiRadiusVal: document.getElementById("ui-radius-val"),
+        btnDefaultLayout: document.getElementById("btn-default-layout"),
+
+        // Gomma avanzata e sostituzione colore
+        xyzTextSize: document.getElementById("xyz-text-size"),
+        eraserModeGroup: document.getElementById("eraser-mode-group"),
+        eraserModeBrush: document.getElementById("eraser-mode-brush"),
+        eraserModeGif: document.getElementById("eraser-mode-gif"),
+        magicWandSettingsGroup: document.getElementById("magic-wand-settings-group"),
+        magicWandTolerance: document.getElementById("magic-wand-tolerance"),
+        magicWandToleranceText: document.getElementById("magic-wand-tolerance-text"),
+        btnRemoveProtectionMask: document.getElementById("btn-remove-protection-mask"),
+        replaceColorFrom: document.getElementById("replace-color-from"),
+        replaceColorTo: document.getElementById("replace-color-to"),
+        replaceColorTolerance: document.getElementById("replace-color-tolerance"),
+        btnAddReplacement: document.getElementById("btn-add-replacement"),
+        replacementsListBox: document.getElementById("replacements-list-box"),
+        btnPickReplaceFrom: document.getElementById("btn-pick-replace-from"),
+        btnPickReplaceTo: document.getElementById("btn-pick-replace-to"),
+
+        // Riferimento bloccato
+        btnImportReference: document.getElementById("btn-import-reference"),
+        fileInputReference: document.getElementById("file-input-reference"),
+
+        // Scope modifiche
+        btnScopeFrame: document.getElementById("btn-scope-frame"),
+        btnScopeGlobal: document.getElementById("btn-scope-global")
+    };
 
     const ctx = dom.mainCanvas.getContext("2d");
 
@@ -176,7 +365,9 @@ document.addEventListener("DOMContentLoaded", () => {
     // ======================================================================
     // 3. FUNZIONI UTILI DI SUPPORTO (HELPERS)
     // ======================================================================
-    
+    function generateId() {
+        return 'livello_' + Math.random().toString(36).substr(2, 9);
+    }
 
     function getActiveFrame() {
         return state.frames[state.activeFrameIndex];
@@ -3813,189 +4004,13 @@ document.addEventListener("DOMContentLoaded", () => {
     // ======================================================================
     // 11. STRUMENTI DI DISEGNO pixel-by-pixel (Pennello/Gomma)
     // ======================================================================
-    function initAdvancedToolsEvents() {
-        // Eventi Forme
-        dom.shapeTypeRect.addEventListener("click", () => {
-            state.shapes.type = "rect";
-            dom.shapeTypeRect.classList.add("active");
-            dom.shapeTypeCircle.classList.remove("active");
-            dom.shapeTypeLine.classList.remove("active");
-        });
-        dom.shapeTypeCircle.addEventListener("click", () => {
-            state.shapes.type = "circle";
-            dom.shapeTypeCircle.classList.add("active");
-            dom.shapeTypeRect.classList.remove("active");
-            dom.shapeTypeLine.classList.remove("active");
-        });
-        dom.shapeTypeLine.addEventListener("click", () => {
-            state.shapes.type = "line";
-            dom.shapeTypeLine.classList.add("active");
-            dom.shapeTypeRect.classList.remove("active");
-            dom.shapeTypeCircle.classList.remove("active");
-        });
-        dom.shapeStrokeWidth.addEventListener("input", (e) => {
-            state.shapes.strokeWidth = parseInt(e.target.value) || 0;
-        });
-        dom.shapeStrokeColor.addEventListener("input", (e) => {
-            state.shapes.strokeColor = e.target.value;
-        });
-        dom.shapeFillEnabled.addEventListener("change", (e) => {
-            state.shapes.fillEnabled = e.target.checked;
-            dom.shapeFillColor.disabled = !e.target.checked;
-            dom.shapeFillColor.style.opacity = e.target.checked ? "1" : "0.3";
-        });
-        dom.shapeFillColor.addEventListener("input", (e) => {
-            state.shapes.fillColor = e.target.value;
-        });
-
-        // Eventi Lazo
-        dom.lassoModeFree.addEventListener("click", () => {
-            state.lasso.mode = "free";
-            dom.lassoModeFree.classList.add("active");
-            dom.lassoModeRect.classList.remove("active");
-        });
-        dom.lassoModeRect.addEventListener("click", () => {
-            state.lasso.mode = "rect";
-            dom.lassoModeRect.classList.add("active");
-            dom.lassoModeFree.classList.remove("active");
-        });
-        
-        dom.btnLassoCut.addEventListener("click", () => {
-            if (!state.lasso.hasSelection || state.lasso.points.length < 3) return;
-            const layer = getActiveLayer();
-            if (!layer || layer.locked) return;
-            saveState();
-
-            const xs = state.lasso.points.map(p => p.x);
-            const ys = state.lasso.points.map(p => p.y);
-            const minX = Math.min(...xs);
-            const maxX = Math.max(...xs);
-            const minY = Math.min(...ys);
-            const maxY = Math.max(...ys);
-            const w = maxX - minX;
-            const h = maxY - minY;
-
-            if (w <= 0 || h <= 0) return;
-
-            const cutCanvas = document.createElement("canvas");
-            cutCanvas.width = w;
-            cutCanvas.height = h;
-            const cCtx = cutCanvas.getContext("2d");
-
-            cCtx.beginPath();
-            state.lasso.points.forEach((p, i) => {
-                const lx = p.x - minX;
-                const ly = p.y - minY;
-                if (i === 0) cCtx.moveTo(lx, ly);
-                else cCtx.lineTo(lx, ly);
-            });
-            cCtx.closePath();
-            cCtx.clip();
-
-            if (layer.canvasImage || layer.img) {
-                const renderSource = typeof applyGlobalFilters === "function" ? applyGlobalFilters(layer, layer.canvasImage || layer.img) : (layer.canvasImage || layer.img);
-                const localMinX = minX - (layer.x + layer.w / 2);
-                const localMinY = minY - (layer.y + layer.h / 2);
-                
-                cCtx.save();
-                cCtx.translate(-localMinX, -localMinY);
-                cCtx.drawImage(renderSource, 0, 0, layer.w, layer.h);
-                cCtx.restore();
-                
-                if (!layer.drawingCanvas) {
-                    layer.drawingCanvas = createDrawingCanvasForLayer(layer.w, layer.h);
-                    const dCtx = layer.drawingCanvas.getContext("2d");
-                    dCtx.drawImage(renderSource, 0, 0, layer.w, layer.h);
-                    layer.canvasImage = layer.drawingCanvas;
-                    layer.img = null;
-                }
-                const lCtx = layer.drawingCanvas.getContext("2d");
-                lCtx.save();
-                lCtx.globalCompositeOperation = "destination-out";
-                lCtx.beginPath();
-                state.lasso.points.forEach((p, i) => {
-                    const lx = p.x - (layer.x + layer.w / 2) + layer.w / 2;
-                    const ly = p.y - (layer.y + layer.h / 2) + layer.h / 2;
-                    if (i === 0) lCtx.moveTo(lx, ly);
-                    else lCtx.lineTo(lx, ly);
-                });
-                lCtx.closePath();
-                lCtx.fill();
-                lCtx.restore();
-            }
-
-            const newLayer = {
-                id: generateId(),
-                groupId: generateId(),
-                type: "image",
-                visible: true,
-                locked: false,
-                opacity: 1,
-                x: minX,
-                y: minY,
-                w: w,
-                h: h,
-                r: 0,
-                canvasImage: cutCanvas,
-                name: "Ritaglio Lazo"
-            };
-
-            const frame = state.frames[state.activeFrameIndex];
-            if (frame) {
-                frame.layers.push(newLayer);
-            }
-            state.lasso.hasSelection = false;
-            state.lasso.points = [];
-            state.activeLayerId = newLayer.id;
-            requestRender();
-            if (typeof renderLayers === "function") renderLayers();
-            updateLayersListUI();
-        });
-
-        dom.btnLassoClear.addEventListener("click", () => {
-            if (!state.lasso.hasSelection || state.lasso.points.length < 3) return;
-            const layer = getActiveLayer();
-            if (!layer || layer.locked) return;
-            saveState();
-
-            if (layer.canvasImage || layer.img) {
-                const renderSource = typeof applyGlobalFilters === "function" ? applyGlobalFilters(layer, layer.canvasImage || layer.img) : (layer.canvasImage || layer.img);
-                if (!layer.drawingCanvas) {
-                    layer.drawingCanvas = createDrawingCanvasForLayer(layer.w, layer.h);
-                    const dCtx = layer.drawingCanvas.getContext("2d");
-                    dCtx.drawImage(renderSource, 0, 0, layer.w, layer.h);
-                    layer.canvasImage = layer.drawingCanvas;
-                    layer.img = null;
-                }
-                const lCtx = layer.drawingCanvas.getContext("2d");
-                lCtx.save();
-                lCtx.globalCompositeOperation = "destination-out";
-                lCtx.beginPath();
-                state.lasso.points.forEach((p, i) => {
-                    const lx = p.x - (layer.x + layer.w / 2) + layer.w / 2;
-                    const ly = p.y - (layer.y + layer.h / 2) + layer.h / 2;
-                    if (i === 0) lCtx.moveTo(lx, ly);
-                    else lCtx.lineTo(lx, ly);
-                });
-                lCtx.closePath();
-                lCtx.fill();
-                lCtx.restore();
-            }
-            state.lasso.hasSelection = false;
-            state.lasso.points = [];
-            requestRender();
-        });
-    }
-
     function initDrawingTools() {
         const tools = [
             { btn: dom.drawSelect, name: "select" },
             { btn: dom.drawBrush, name: "brush" },
             { btn: dom.drawEraser, name: "eraser" },
             { btn: dom.drawPicker, name: "picker" },
-            { btn: dom.drawMagicWand, name: "magic_wand" },
-            { btn: dom.drawToolShapes, name: "shapes" },
-            { btn: dom.drawToolLasso, name: "lasso" }
+            { btn: dom.drawMagicWand, name: "magic_wand" }
         ];
 
         tools.forEach(t => {
@@ -4004,28 +4019,22 @@ document.addEventListener("DOMContentLoaded", () => {
                 t.btn.classList.add("active");
                 state.activeTool = t.name;
                 
-                // Nascondi tutti i gruppi di opzioni
-                if (dom.brushSettings) dom.brushSettings.style.display = "none";
-                if (dom.eraserModeGroup) dom.eraserModeGroup.style.display = "none";
-                if (dom.magicWandSettingsGroup) dom.magicWandSettingsGroup.style.display = "none";
-                if (dom.shapesSettingsGroup) dom.shapesSettingsGroup.style.display = "none";
-                if (dom.lassoSettingsGroup) dom.lassoSettingsGroup.style.display = "none";
-
-                // Mostra quello corretto in base allo strumento
                 if (t.name === "brush" || t.name === "eraser") {
-                    if (dom.brushSettings) dom.brushSettings.style.display = "block";
+                    dom.brushSettings.style.display = "block";
+                } else {
+                    dom.brushSettings.style.display = "none";
                 }
+
                 if (t.name === "eraser") {
-                    if (dom.eraserModeGroup) dom.eraserModeGroup.style.display = "block";
+                    dom.eraserModeGroup.style.display = "block";
+                } else {
+                    dom.eraserModeGroup.style.display = "none";
                 }
+
                 if (t.name === "magic_wand") {
-                    if (dom.magicWandSettingsGroup) dom.magicWandSettingsGroup.style.display = "block";
-                }
-                if (t.name === "shapes") {
-                    if (dom.shapesSettingsGroup) dom.shapesSettingsGroup.style.display = "block";
-                }
-                if (t.name === "lasso") {
-                    if (dom.lassoSettingsGroup) dom.lassoSettingsGroup.style.display = "block";
+                    dom.magicWandSettingsGroup.style.display = "block";
+                } else {
+                    dom.magicWandSettingsGroup.style.display = "none";
                 }
 
                 requestRender();
@@ -4201,21 +4210,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (state.activeTool === "magic_wand") {
             const localCoords = mapGlobalToLayerCoords(coords.x, coords.y, layer);
             saveState();
-            magicWandTool.onMouseDown(localCoords, layer);
-            return;
-        }
-
-        if (state.activeTool === "shapes") {
-            state.shapes.isDrawing = true;
-            state.shapes.startX = coords.x;
-            state.shapes.startY = coords.y;
-            state.shapes.currentX = coords.x;
-            state.shapes.currentY = coords.y;
-            shapesTool.onMouseDown(coords);
-            return;
-        }
-        if (state.activeTool === "lasso") {
-            lassoTool.onMouseDown(coords);
+            applyMagicWand(layer, localCoords.x, localCoords.y);
             return;
         }
 
@@ -4241,24 +4236,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function drawMove(e) {
-                if (state.activeTool === "shapes" && state.shapes.isDrawing) {
-            const coords = getCoordsOnCanvas(e);
-            state.shapes.currentX = coords.x;
-            state.shapes.currentY = coords.y;
-            requestRender();
-            return;
-        }
-        if (state.activeTool === "lasso" && state.lasso.isDrawing) {
-            const coords = getCoordsOnCanvas(e);
-            state.lasso.currentX = coords.x;
-            state.lasso.currentY = coords.y;
-            if (state.lasso.mode === "free") {
-                state.lasso.points.push({ x: coords.x, y: coords.y });
-            }
-            requestRender();
-            return;
-        }
-
         if (!state.brush.isDrawing) return;
         const layer = getActiveLayer();
         if (!layer || layer.locked || !layer.drawingCanvas) return;
@@ -4273,96 +4250,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function stopDrawing() {
-        if (state.activeTool === "shapes" && state.shapes.isDrawing) {
-            state.shapes.isDrawing = false;
-            const sx = state.shapes.startX;
-            const sy = state.shapes.startY;
-            const ex = state.shapes.currentX;
-            const ey = state.shapes.currentY;
-
-            if (Math.abs(ex - sx) < 3 && Math.abs(ey - sy) < 3) {
-                requestRender();
-                return;
-            }
-
-            const minX = Math.min(sx, ex);
-            const minY = Math.min(sy, ey);
-            const w = Math.abs(ex - sx) || 4;
-            const h = Math.abs(ey - sy) || 4;
-
-            const shapeCanvas = document.createElement("canvas");
-            const pad = state.shapes.strokeWidth;
-            shapeCanvas.width = w + pad * 2;
-            shapeCanvas.height = h + pad * 2;
-            const sCtx = shapeCanvas.getContext("2d");
-
-            sCtx.strokeStyle = state.shapes.strokeColor;
-            sCtx.lineWidth = pad;
-            if (state.shapes.fillEnabled) sCtx.fillStyle = state.shapes.fillColor;
-
-            sCtx.beginPath();
-            if (state.shapes.type === "rect") {
-                if (state.shapes.fillEnabled) sCtx.fillRect(pad, pad, w, h);
-                if (pad > 0) sCtx.strokeRect(pad, pad, w, h);
-            } else if (state.shapes.type === "circle") {
-                const rx = w / 2;
-                const ry = h / 2;
-                sCtx.ellipse(pad + rx, pad + ry, rx, ry, 0, 0, Math.PI * 2);
-                if (state.shapes.fillEnabled) sCtx.fill();
-                if (pad > 0) sCtx.stroke();
-            } else if (state.shapes.type === "line") {
-                const startX = (sx < ex) ? pad : pad + w;
-                const startY = (sy < ey) ? pad : pad + h;
-                const endX = (ex < sx) ? pad : pad + w;
-                const endY = (ey < sy) ? pad : pad + h;
-                sCtx.moveTo(startX, startY);
-                sCtx.lineTo(endX, endY);
-                if (pad > 0) sCtx.stroke();
-            }
-
-            saveState();
-            const newLayer = {
-                id: generateId(),
-                type: "image",
-                visible: true,
-                locked: false,
-                opacity: 1,
-                x: minX - pad,
-                y: minY - pad,
-                w: shapeCanvas.width,
-                h: shapeCanvas.height,
-                r: 0,
-                canvasImage: shapeCanvas,
-                name: `Forma (${state.shapes.type})`
-            };
-
-            const frame = getActiveFrame();
-            if (frame) {
-                frame.layers.push(newLayer);
-                state.activeLayerId = newLayer.id;
-            }
-
-            requestRender();
-            if (typeof renderLayers === "function") renderLayers();
-            return;
-        }
-
-        if (state.activeTool === "lasso" && state.lasso.isDrawing) {
-            state.lasso.isDrawing = false;
-            state.lasso.hasSelection = true;
-            if (state.lasso.mode === "rect") {
-                const sx = state.lasso.startX;
-                const sy = state.lasso.startY;
-                const ex = state.lasso.currentX;
-                const ey = state.lasso.currentY;
-                state.lasso.points = [
-                    { x: sx, y: sy }, { x: ex, y: sy },
-                    { x: ex, y: ey }, { x: sx, y: ey }
-                ];
-            }
-            requestRender();
-            return;
-        }
         state.brush.isDrawing = false;
     }
 
@@ -4904,16 +4791,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
                     if (isFirstImport) {
                         applyWorkspaceDimensions(img.width, img.height);
-                    } else {
-                        // Crea un nuovo frame per il file secondario!
-                        const newFrame = {
-                            id: generateId(),
-                            delay: 100,
-                            layers: []
-                        };
-                        state.frames.push(newFrame);
-                        state.activeFrameIndex = state.frames.length - 1;
-                        buildTimelineUI();
                     }
 
                     const newLayer = {
@@ -4939,8 +4816,8 @@ document.addEventListener("DOMContentLoaded", () => {
                         keyframes: {}
                     };
                     addLayer(newLayer);
-                    // Centra la vista sull'immagine importata
-                    state.zoom = 1.0;
+                    // Ricalcola auto-zoom e centra la vista sull'immagine importata
+                    autoZoomToFit(state.canvasWidth, state.canvasHeight);
                     setTimeout(centerCanvas, 80);
                 };
                 img.src = e.target.result;
@@ -4965,7 +4842,14 @@ document.addEventListener("DOMContentLoaded", () => {
                     type: "image",
                     x: 0,
                     y: 0,
-                    w: state.canvasWidth, h: state.canvasHeight, visible: true, opacity: 0.7, r: 0, keepRatio: true, aspectRatio: 1, img: null,
+                    w: state.canvasWidth,
+                    h: state.canvasHeight,
+                    visible: true,
+                    opacity: 0.7,
+                    r: 0,
+                    keepRatio: true,
+                    aspectRatio: 1,
+                    img: null,
                     borderRadius: 0,
                     locked: true,
                     isReference: true,
@@ -4993,7 +4877,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (state.activeTool !== "select") {
                     dom.drawSelect.click();
                 }
-                state.zoom = 1.0;
+                autoZoomToFit(state.canvasWidth, state.canvasHeight);
                 setTimeout(centerCanvas, 80);
             };
             reader.readAsArrayBuffer(file);
@@ -5009,10 +4893,10 @@ document.addEventListener("DOMContentLoaded", () => {
                         groupId: sharedGroupId,
                         name: "Rif: " + file.name.substring(0, 12),
                         type: "image",
-                        x: Math.round((state.canvasWidth - (img.width * Math.min(state.canvasWidth / img.width, state.canvasHeight / img.height, 1))) / 2),
-                        y: Math.round((state.canvasHeight - (img.height * Math.min(state.canvasWidth / img.width, state.canvasHeight / img.height, 1))) / 2),
-                        w: Math.round(img.width * Math.min(state.canvasWidth / img.width, state.canvasHeight / img.height, 1)),
-                        h: Math.round(img.height * Math.min(state.canvasWidth / img.width, state.canvasHeight / img.height, 1)),
+                        x: Math.round((state.canvasWidth - img.width) / 2),
+                        y: Math.round((state.canvasHeight - img.height) / 2),
+                        w: img.width,
+                        h: img.height,
                         visible: true,
                         opacity: 0.7, // Opacità 70% di default per ricalco
                         r: 0,
@@ -5044,8 +4928,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (state.activeTool !== "select") {
                         dom.drawSelect.click();
                     }
-                    // Centra la vista
-                    state.zoom = 1.0;
+                    // Ricalcola auto-zoom e centra la vista
+                    autoZoomToFit(state.canvasWidth, state.canvasHeight);
                     setTimeout(centerCanvas, 80);
                 };
                 img.src = e.target.result;
@@ -5174,8 +5058,8 @@ document.addEventListener("DOMContentLoaded", () => {
             
             dom.statusFramesCount.innerText = `1/${state.frames.length}`;
             
-            // Centra la vista
-            state.zoom = 1.0;
+            // Auto zoom del canvas all'importazione e centra la vista
+            autoZoomToFit(gifWidth, gifHeight);
             setTimeout(centerCanvas, 100);
 
         } catch (err) {
@@ -7159,7 +7043,6 @@ document.addEventListener("DOMContentLoaded", () => {
         setupWindowManager();
         initCanvasWorkspace();
         initDrawingTools();
-        initAdvancedToolsEvents();
         initFileHandlers();
         initTimelineControls();
         initFilterTools();
@@ -7411,8 +7294,6 @@ document.addEventListener("DOMContentLoaded", () => {
             "tut-title-bg-transparent": "Trasparenza Colore: Clicca su un colore dell'immagine per bucarlo come fosse un green-screen.",
             "tut-title-bg-auto": "Trasparenza Automatica: Cerca di rimuovere in automatico lo sfondo esterno attorno all'immagine.",
             "tut-title-replace-color": "Sostituisci Colore: Trasforma magicamente tutti i pixel di un certo colore in un altro colore in tutta la GIF.",
-            "tut-title-shapes-settings": "Impostazioni Forme: Permette di scegliere il tipo di forma, colore, spessore e riempimento.",
-            "tut-title-lasso-settings": "Impostazioni Lazo: Scegli tra selezione libera o rettangolare e ritaglia l'immagine.",
             
             // TAVOLA DA DISEGNO
             "btn-zoom-out": "Riduci: Rimpicciolisce la vista della tavola da disegno per farti vedere il quadro generale.",  

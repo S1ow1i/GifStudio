@@ -514,7 +514,15 @@ body, html {
     flex-grow: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: var(--space-lg);
+    padding: var(--space-md); /* Ridotto da lg a md per far entrare più contenuti */
+    min-height: 0;
+    min-width: 0;
+    scrollbar-width: none; /* Nasconde la scrollbar in Firefox */
+}
+
+/* Nasconde la scrollbar in Chrome/Edge/Safari per i contenuti delle finestre */
+.window-content::-webkit-scrollbar {
+    display: none;
 }
 
 .window-content.flex-column {
@@ -559,6 +567,8 @@ body, html {
    -------------------------------------------------------------------------- */
 .canvas-workspace-wrapper {
     padding: 0 !important;
+    display: flex;
+    flex-direction: column;
 }
 
 .canvas-toolbar {
@@ -570,6 +580,14 @@ body, html {
     align-items: center;
     padding: 0 var(--space-md);
     gap: var(--space-sm);
+}
+
+.style-property-section {
+    background: rgba(0, 0, 0, 0.15);
+    border: 1px solid var(--border-window);
+    border-radius: var(--radius-window);
+    padding: var(--space-sm); /* Ridotto padding */
+    margin-bottom: var(--space-sm); /* Ridotto margin-bottom */
 }
 
 .tool-btn-small {
@@ -613,19 +631,20 @@ body, html {
     overflow: auto;
     position: relative;
     background-color: transparent;
+    text-align: center; /* Regola aurea: centra orizzontalmente gli inline-block */
 }
 
 #canvas-viewport {
-    min-width: 100%;
-    min-height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 60px;
+    display: inline-block; /* Avvolge perfettamente il contenuto, niente clipping */
+    position: relative;
+    padding: 10px; /* Minimo spazio tra griglia ed esterno, per massimizzare la superficie */
+    text-align: left; /* Ripristina l'allineamento testo per il contenuto */
+    margin-top: 0;
 }
 
 #canvas-border-shadow {
-    box-shadow: 0 25px 60px rgba(0,0,0,0.7);
+    display: block;
+    box-shadow: 0 0 60px rgba(0,0,0,0.7); /* Ombra perfettamente simmetrica su tutti i lati */
     border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
@@ -1070,7 +1089,7 @@ select option {
 .tool-btn-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: var(--space-sm);
+    gap: var(--space-xs); /* Ridotto il gap per compattare la griglia */
 }
 
 .tool-btn-grid-row {
@@ -1770,38 +1789,44 @@ input[type="number"].ui-number-compact:focus {
 }
 
 .tab-btn {
-    flex: 0 0 auto;
-    min-width: max-content;
-    min-height: var(--win-tabs-h);
-    padding: 0 24px;
-    background: transparent;
-    border: none;
-    border-bottom: 3px solid transparent;
+    flex: 1 1 0;
+    min-width: 0;
+    height: calc(100% - 10px);
+    margin: 5px 3px;
+    padding: 0 6px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid transparent;
+    border-radius: 6px;
     color: var(--text-secondary);
     text-shadow: var(--text-shadow-secondary, none);
     font-family: inherit;
-    font-size: 14px;
+    font-size: 11px;
     font-weight: 700;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: var(--space-sm);
+    gap: 4px;
     transition: all 0.2s ease;
     outline: none;
     text-transform: uppercase;
     letter-spacing: 0.3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .tab-btn:hover {
     color: var(--accent-color);
+    border: 1px solid rgba(var(--accent-color-rgb), 0.5);
     background: rgba(var(--accent-color-rgb), 0.05);
 }
 
 .tab-btn.active {
     color: var(--accent-color);
-    border-bottom-color: var(--accent-color);
-    background: rgba(var(--accent-color-rgb), 0.05);
+    border: 1px solid var(--accent-color);
+    background: rgba(var(--accent-color-rgb), 0.08);
+    box-shadow: 0 0 6px rgba(var(--accent-color-rgb), 0.15);
 }
 
 .tab-order-selector {

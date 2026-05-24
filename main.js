@@ -85,7 +85,7 @@ function openUrlInLightBrowser(url) {
 function downloadUpdateToDownloads(downloadUrl, version) {
     const downloadsDir = path.join(app.getPath('home'), 'Downloads');
     const safeVersion = String(version || 'latest').replace(/[^0-9.]/g, '') || 'latest';
-    const fileName = `gifstudio-portable-v${safeVersion}.exe`;
+    const fileName = `GifStudio_Setup_v${safeVersion}.exe`;
     const targetPath = path.join(downloadsDir, fileName);
     const tempPath = `${targetPath}.download`;
 
@@ -101,7 +101,21 @@ function downloadUpdateToDownloads(downloadUrl, version) {
                 try { fs.unlinkSync(targetPath); } catch (_) { /* sovrascrivi se possibile */ }
             }
             fs.renameSync(tempPath, targetPath);
-            return { ok: true, path: targetPath, fileName };
+            
+            // Avvia automaticamente il setup scaricato
+            try {
+                const { spawn } = require('child_process');
+                spawn(targetPath, [], { detached: true, stdio: 'ignore' }).unref();
+                
+                // Chiudiamo l'applicazione corrente dopo 2 secondi per permettere all'installer di lavorare
+                setTimeout(() => {
+                    app.quit();
+                }, 2000);
+            } catch (spawnErr) {
+                console.warn('Impossibile avviare automaticamente il setup:', spawnErr);
+            }
+
+            return { ok: true, path: targetPath, fileName, autoStarted: true };
         })
         .catch((err) => {
             try {

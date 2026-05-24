@@ -1,10 +1,3 @@
-import { generateId } from './core/Utils.js';
-import { state } from './core/State.js';
-import { dom } from './core/DOM.js';
-import { shapesTool } from './tools/ShapesTool.js';
-import { lassoTool } from './tools/LassoTool.js';
-import { magicWandTool } from './tools/MagicWandTool.js';
-
 /* ==========================================================================
    GIF STUDIO - LOGICA APPLICAZIONE & FUNZIONALITÀ INTERFACCIA
    ========================================================================== */
@@ -13,7 +6,60 @@ document.addEventListener("DOMContentLoaded", () => {
     // ======================================================================
     // 1. STATO GLOBALE DELL'APPLICAZIONE
     // ======================================================================
-    
+    const state = {
+        canvasWidth: 800,
+        canvasHeight: 600,
+        zoom: 1.0,
+        gridActive: false,
+        
+        // Sequenza delle immagini GIF
+        frames: [
+            {
+                id: generateId(),
+                delay: 100, // tempo in millisecondi (ms)
+                layers: []  // Livelli presenti in questo specifico fotogramma
+            }
+        ],
+        activeFrameIndex: 0,
+        activeLayerId: null,
+        
+        // Strumento di disegno in uso
+        activeTool: "select", // "select" (sposta), "brush" (pennello), "eraser" (gomma), "picker" (copia colore), "magic_wand"
+        eraserMode: "brush", // "brush" (tratti) o "gif" (pixel sfondo GIF)
+        editScope: "local", // "local" (solo frame corrente) o "global" (tutta la gif)
+        colorReplacements: [], // lista sostituzioni globali
+        magicWandTolerance: 20,
+        protectionMask: null, // Maschera di protezione calcolata dalla bacchetta magica
+        history: {
+            past: [],
+            future: []
+        },
+        brush: {
+            size: 5,
+            color: "#00ffcc",
+            hardness: 100,
+            isDrawing: false,
+            lastX: 0,
+            lastY: 0
+        },
+        
+        // Riproduzione della GIF
+        isPlaying: false,
+        playInterval: null,
+        
+        // Registro delle posizioni e grandezze delle finestre
+        windows: {},
+
+        // Stacks storici per Undo & Redo
+        undoStack: [],
+        redoStack: [],
+        
+        // Target attivo per la pipetta (copia colore)
+        colorPickerTarget: "brush", // "brush", "chroma", "replace-from", "replace-to", "bg-remove", "bg-transparent-pick"
+        lastPickedTransparencyCoords: null,
+        exportDirectoryHandle: null,
+        autoKeyframe: true
+    };
 
     let layoutRestoreComplete = false;
     let lastKnownScreen = { w: window.innerWidth, h: window.innerHeight };
@@ -166,7 +212,165 @@ document.addEventListener("DOMContentLoaded", () => {
     // ======================================================================
     // 2. ELEMENTI DELLA SCHERMATA (DOM)
     // ======================================================================
-    
+    const dom = {
+        desktop: document.getElementById("desktop"),
+        windowContainer: document.getElementById("window-container"),
+        mainCanvas: document.getElementById("main-canvas"),
+        canvasViewport: document.getElementById("canvas-viewport"),
+        scrollContainer: document.getElementById("canvas-scroll-container"),
+        zoomText: document.getElementById("zoom-text"),
+        statusCanvasSize: document.getElementById("status-canvas-size"),
+        statusActiveLayer: document.getElementById("status-active-layer"),
+        statusFramesCount: document.getElementById("status-frames-count"),
+        
+        // Undo e Redo
+        btnUndo: document.getElementById("btn-undo"),
+        btnRedo: document.getElementById("btn-redo"),
+        
+        // Importazione ed Esportazione
+        ioWidth: document.getElementById("io-canvas-width"),
+        ioHeight: document.getElementById("io-canvas-height"),
+        applyCanvasSize: document.getElementById("btn-apply-canvas-size"),
+        fileInput: document.getElementById("file-input"),
+        fileDropzone: document.getElementById("file-dropzone"),
+        exportFormat: document.getElementById("export-format"),
+        exportFile: document.getElementById("btn-export-file"),
+        
+        // Livelli (Layers)
+        layerList: document.getElementById("layer-list"),
+        addTextLayer: document.getElementById("btn-add-text-layer"),
+        deleteLayer: document.getElementById("btn-delete-layer"),
+        
+        // Muovi XYZ
+        xyzX: document.getElementById("xyz-val-x"),
+        xyzY: document.getElementById("xyz-val-y"),
+        xyzZ: document.getElementById("xyz-val-z"),
+        xyzW: document.getElementById("xyz-val-w"),
+        xyzH: document.getElementById("xyz-val-h"),
+        xyzR: document.getElementById("xyz-val-r"),
+        xyzOpacity: document.getElementById("xyz-val-opacity"),
+        xyzKeepRatio: document.getElementById("xyz-keep-ratio"),
+        xyzNoWarning: document.getElementById("xyz-no-layer-warning"),
+        xyzControls: document.getElementById("xyz-controls"),
+        
+        // Gestione scritte di testo
+        xyzTextEditGroup: document.getElementById("xyz-text-edit-group"),
+        xyzTextContent: document.getElementById("xyz-text-content"),
+        xyzTextFont: document.getElementById("xyz-text-font"),
+        xyzTextColor: document.getElementById("xyz-text-color"),
+        xyzTextStartFrame: document.getElementById("xyz-text-start-frame"),
+        xyzTextEndFrame: document.getElementById("xyz-text-end-frame"),
+        
+        // Strumenti Disegno
+        drawSelect: document.getElementById("draw-tool-select"),
+        drawBrush: document.getElementById("draw-tool-brush"),
+        drawEraser: document.getElementById("draw-tool-eraser"),
+        drawPicker: document.getElementById("draw-tool-picker"),
+        drawMagicWand: document.getElementById("draw-tool-magic-wand"),
+        drawToolShapes: document.getElementById("draw-tool-shapes"),
+        drawToolLasso: document.getElementById("draw-tool-lasso"),
+        shapesSettingsGroup: document.getElementById("shapes-settings-group"),
+        shapeTypeRect: document.getElementById("shape-type-rect"),
+        shapeTypeCircle: document.getElementById("shape-type-circle"),
+        shapeTypeLine: document.getElementById("shape-type-line"),
+        shapeStrokeWidth: document.getElementById("shape-stroke-width"),
+        shapeStrokeColor: document.getElementById("shape-stroke-color"),
+        shapeFillEnabled: document.getElementById("shape-fill-enabled"),
+        shapeFillColor: document.getElementById("shape-fill-color"),
+        lassoSettingsGroup: document.getElementById("lasso-settings-group"),
+        lassoModeFree: document.getElementById("lasso-mode-free"),
+        lassoModeRect: document.getElementById("lasso-mode-rect"),
+        btnLassoCut: document.getElementById("btn-lasso-cut"),
+        btnLassoClear: document.getElementById("btn-lasso-clear"),
+        brushSettings: document.getElementById("brush-settings-group"),
+        brushSize: document.getElementById("brush-size"),
+        brushColor: document.getElementById("brush-color"),
+        brushHardness: document.getElementById("brush-hardness"),
+        brushHardnessText: document.getElementById("brush-hardness-text"),
+        
+        // Filtri e Trasparenza Sfondo
+        bgRemoveActive: document.getElementById("bg-remove-active"),
+        bgRemoveColor: document.getElementById("bg-remove-color"),
+        btnPickBgRemoveColor: document.getElementById("btn-pick-bg-remove-color"),
+        bgRemoveTolerance: document.getElementById("bg-remove-tolerance"),
+        bgRemoveToleranceSlider: document.getElementById("bg-remove-tolerance-slider"),
+        bgTransparentColor: document.getElementById("bg-transparent-color"),
+        btnPickTransparentColor: document.getElementById("btn-pick-transparent-color"),
+        bgTransparentTolerance: document.getElementById("bg-transparent-tolerance"),
+        bgTransparentToleranceSlider: document.getElementById("bg-transparent-tolerance-slider"),
+        transparentPickStatus: document.getElementById("transparent-pick-status"),
+        btnAddTransparencyRule: document.getElementById("btn-add-transparency-rule"),
+        transparencyRulesListBox: document.getElementById("transparency-rules-list-box"),
+        bgTransparencyType: document.getElementById("bg-transparency-type"),
+        keyframeTarget: document.getElementById("keyframe-target"),
+        btnAddKeyframe: document.getElementById("btn-add-keyframe"),
+        btnDeleteKeyframe: document.getElementById("btn-delete-keyframe"),
+        kfPropX: document.getElementById("kf-prop-x"),
+        kfPropY: document.getElementById("kf-prop-y"),
+        kfPropZ: document.getElementById("kf-prop-z"),
+        kfPropR: document.getElementById("kf-prop-r"),
+        kfPropOpacity: document.getElementById("kf-prop-opacity"),
+        kfPropW: document.getElementById("kf-prop-w"),
+        kfPropH: document.getElementById("kf-prop-h"),
+        filterBorderRadius: document.getElementById("filter-border-radius"),
+        btnApplyCorners: document.getElementById("btn-apply-corners"),
+        
+        // Timeline e Riproduttore
+        framesTrack: document.getElementById("timeline-frames-box"),
+        keyframesTrackBox: document.getElementById("keyframes-track-box"),
+        kfAutoKeyframe: document.getElementById("kf-auto-keyframe"),
+        btnGotoPrevKeyframe: document.getElementById("btn-goto-prev-keyframe"),
+        btnGotoNextKeyframe: document.getElementById("btn-goto-next-keyframe"),
+        btnPlayGif: document.getElementById("btn-play-gif"),
+        btnPauseGif: document.getElementById("btn-pause-gif"),
+        timelineDelay: document.getElementById("timeline-delay"),
+        btnApplyDelayAll: document.getElementById("btn-apply-delay-all"),
+        btnDuplicateFrame: document.getElementById("btn-duplicate-frame"),
+        btnDeleteFrame: document.getElementById("btn-delete-frame"),
+        btnReverseFrames: document.getElementById("btn-reverse-frames"),
+        timelineSpeed: document.getElementById("timeline-speed-scale"),
+        btnOptimizeGif: document.getElementById("btn-optimize-gif"),
+        
+        // UI Customizer (Temi e Colori)
+        themeDark: document.getElementById("theme-dark"),
+        themeCyber: document.getElementById("theme-cyber"),
+        themeTerminal: document.getElementById("theme-terminal"),
+        themeLight: document.getElementById("theme-light"),
+        uiColorBg: document.getElementById("ui-color-bg"),
+        uiColorWin: document.getElementById("ui-color-win"),
+        uiColorText: document.getElementById("ui-color-text"),
+        uiColorAccent: document.getElementById("ui-color-accent"),
+        uiFontFamily: document.getElementById("ui-font-family"),
+        uiFontSize: document.getElementById("ui-font-size"),
+        uiWindowRadius: document.getElementById("ui-window-radius"),
+        uiRadiusVal: document.getElementById("ui-radius-val"),
+        btnDefaultLayout: document.getElementById("btn-default-layout"),
+
+        // Gomma avanzata e sostituzione colore
+        xyzTextSize: document.getElementById("xyz-text-size"),
+        eraserModeGroup: document.getElementById("eraser-mode-group"),
+        eraserModeBrush: document.getElementById("eraser-mode-brush"),
+        eraserModeGif: document.getElementById("eraser-mode-gif"),
+        magicWandSettingsGroup: document.getElementById("magic-wand-settings-group"),
+        magicWandTolerance: document.getElementById("magic-wand-tolerance"),
+        magicWandToleranceText: document.getElementById("magic-wand-tolerance-text"),
+        btnRemoveProtectionMask: document.getElementById("btn-remove-protection-mask"),
+        replaceColorFrom: document.getElementById("replace-color-from"),
+        replaceColorTo: document.getElementById("replace-color-to"),
+        replaceColorTolerance: document.getElementById("replace-color-tolerance"),
+        btnAddReplacement: document.getElementById("btn-add-replacement"),
+        replacementsListBox: document.getElementById("replacements-list-box"),
+        btnPickReplaceFrom: document.getElementById("btn-pick-replace-from"),
+        btnPickReplaceTo: document.getElementById("btn-pick-replace-to"),
+
+        // Riferimento bloccato
+        btnImportReference: document.getElementById("btn-import-reference"),
+        fileInputReference: document.getElementById("file-input-reference"),
+
+        // Scope modifiche
+        btnScopeFrame: document.getElementById("btn-scope-frame"),
+        btnScopeGlobal: document.getElementById("btn-scope-global")
+    };
 
     const ctx = dom.mainCanvas.getContext("2d");
 
@@ -176,7 +380,9 @@ document.addEventListener("DOMContentLoaded", () => {
     // ======================================================================
     // 3. FUNZIONI UTILI DI SUPPORTO (HELPERS)
     // ======================================================================
-    
+    function generateId() {
+        return 'livello_' + Math.random().toString(36).substr(2, 9);
+    }
 
     function getActiveFrame() {
         return state.frames[state.activeFrameIndex];
@@ -4201,7 +4407,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (state.activeTool === "magic_wand") {
             const localCoords = mapGlobalToLayerCoords(coords.x, coords.y, layer);
             saveState();
-            magicWandTool.onMouseDown(localCoords, layer);
+            applyMagicWand(layer, localCoords.x, localCoords.y);
             return;
         }
 
@@ -4211,11 +4417,18 @@ document.addEventListener("DOMContentLoaded", () => {
             state.shapes.startY = coords.y;
             state.shapes.currentX = coords.x;
             state.shapes.currentY = coords.y;
-            shapesTool.onMouseDown(coords);
+            requestRender();
             return;
         }
         if (state.activeTool === "lasso") {
-            lassoTool.onMouseDown(coords);
+            state.lasso.isDrawing = true;
+            state.lasso.hasSelection = false;
+            state.lasso.points = [{ x: coords.x, y: coords.y }];
+            state.lasso.startX = coords.x;
+            state.lasso.startY = coords.y;
+            state.lasso.currentX = coords.x;
+            state.lasso.currentY = coords.y;
+            requestRender();
             return;
         }
 
