@@ -3810,6 +3810,42 @@ document.addEventListener("DOMContentLoaded", () => {
             ctx.restore();
         });
 
+        // Anteprima Forme Geometriche in Tempo Reale
+        if (state.activeTool === "shapes" && state.shapes.isDrawing) {
+            ctx.save();
+            ctx.strokeStyle = state.shapes.strokeColor;
+            ctx.lineWidth = state.shapes.strokeWidth;
+            if (state.shapes.fillEnabled) ctx.fillStyle = state.shapes.fillColor;
+            
+            const sx = state.shapes.startX;
+            const sy = state.shapes.startY;
+            const ex = state.shapes.currentX;
+            const ey = state.shapes.currentY;
+            
+            ctx.beginPath();
+            if (state.shapes.type === "rect") {
+                const w = ex - sx;
+                const h = ey - sy;
+                if (state.shapes.fillEnabled) ctx.fillRect(sx, sy, w, h);
+                if (state.shapes.strokeWidth > 0) ctx.strokeRect(sx, sy, w, h);
+            } else if (state.shapes.type === "circle") {
+                const minX = Math.min(sx, ex);
+                const minY = Math.min(sy, ey);
+                const w = Math.abs(ex - sx) || 1;
+                const h = Math.abs(ey - sy) || 1;
+                const rx = w / 2;
+                const ry = h / 2;
+                ctx.ellipse(minX + rx, minY + ry, rx, ry, 0, 0, Math.PI * 2);
+                if (state.shapes.fillEnabled) ctx.fill();
+                if (state.shapes.strokeWidth > 0) ctx.stroke();
+            } else if (state.shapes.type === "line") {
+                ctx.moveTo(sx, sy);
+                ctx.lineTo(ex, ey);
+                if (state.shapes.strokeWidth > 0) ctx.stroke();
+            }
+            ctx.restore();
+        }
+
         if (state.gridActive) {
             drawGridLines();
         }
@@ -4163,6 +4199,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function startDrawing(e) {
+        const coords = getCoordsOnCanvas(e);
+        const layer = getActiveLayer();
+        if (!layer) return;
+
         if (state.activeTool === "select") {
             selectTool.onMouseMove(coords, layer, requestRender);
             return;
