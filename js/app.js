@@ -2644,7 +2644,12 @@ document.addEventListener("DOMContentLoaded", () => {
     // 7. MOTORE DI RENDERING E GESTIONE AREA CANVAS
     // ======================================================================
     function initCanvasWorkspace() {
-        applyWorkspaceDimensions(800, 600);
+        // Applica le dimensioni solo quando il layout è pronto
+        setTimeout(() => {
+            const availW = dom.scrollContainer.clientWidth > 100 ? dom.scrollContainer.clientWidth - 40 : 800;
+            const availH = dom.scrollContainer.clientHeight > 100 ? dom.scrollContainer.clientHeight - 40 : 600;
+            applyWorkspaceDimensions(availW, availH);
+        }, 100);
         
         dom.scrollContainer.addEventListener("wheel", (e) => {
             if (e.ctrlKey) {
@@ -2689,18 +2694,28 @@ document.addEventListener("DOMContentLoaded", () => {
         dom.ioHeight.value = h;
         dom.statusCanvasSize.innerText = `${w}x${h} px`;
         
-        adjustZoom(state.zoom);
+        autoZoomToFit(w, h);
         requestRender();
     }
 
     function adjustZoom(newZoom) {
         state.zoom = Math.max(0.1, Math.min(30.0, newZoom));
-        dom.mainCanvas.style.transform = `scale(${state.zoom})`;
+        
+        // Rimuoviamo transform: scale() che non altera il layout flexbox, causando l'offset
+        dom.mainCanvas.style.transform = "none";
+        
+        // Impostiamo larghezza e altezza in pixel fisici per il layout
+        const visualWidth = state.canvasWidth * state.zoom;
+        const visualHeight = state.canvasHeight * state.zoom;
+        
+        dom.mainCanvas.style.width = `${visualWidth}px`;
+        dom.mainCanvas.style.height = `${visualHeight}px`;
+        
         dom.zoomText.innerText = `${Math.round(state.zoom * 100)}%`;
         
         const extraPadding = 200;
-        dom.canvasViewport.style.width = `${(state.canvasWidth * state.zoom) + extraPadding}px`;
-        dom.canvasViewport.style.height = `${(state.canvasHeight * state.zoom) + extraPadding}px`;
+        dom.canvasViewport.style.width = `${visualWidth + extraPadding}px`;
+        dom.canvasViewport.style.height = `${visualHeight + extraPadding}px`;
     }
 
     function centerCanvas() {
@@ -8021,6 +8036,7 @@ document.addEventListener("DOMContentLoaded", () => {
         document.addEventListener('keydown', (e) => {
             if (e.ctrlKey && e.shiftKey && (e.key === 'D' || e.key === 'd')) {
                 e.preventDefault();
+                winDebug.style.height = '480px'; // Forza sempre altezza per evitare tagli da localStorage
                 winDebug.style.display = winDebug.style.display === 'none' ? 'flex' : 'none';
                 if (window.updateDebugPanelUI) window.updateDebugPanelUI();
             }
@@ -8105,6 +8121,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     initTabOrderSystem();
     initInteractiveTutorial();
-    initDebugPanel();
+    // Inizializzazione disabilitata su richiesta
+    // initDebugPanel();
     startApp();
 });

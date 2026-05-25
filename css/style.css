@@ -635,7 +635,9 @@ body, html {
 }
 
 #canvas-viewport {
-    display: block; /* Block con margin auto per centratura safe senza crop */
+    display: flex; /* Sostituito block con flex per centratura assoluta */
+    justify-content: center;
+    align-items: center;
     margin: auto;
     position: relative;
     padding: 10px; /* Minimo spazio tra griglia ed esterno, per massimizzare la superficie */
