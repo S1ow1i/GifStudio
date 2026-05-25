@@ -2693,6 +2693,20 @@ document.addEventListener("DOMContentLoaded", () => {
         dom.ioWidth.value = w;
         dom.ioHeight.value = h;
         dom.statusCanvasSize.innerText = `${w}x${h} px`;
+
+        // Adatta la grandezza degli strumenti alle proporzioni del canvas
+        const minDim = Math.min(w, h);
+        const autoBrushSize = Math.max(1, Math.round(minDim * 0.02)); // 2% 
+        const autoShapeSize = Math.max(1, Math.round(minDim * 0.01)); // 1%
+        
+        if (dom.brushSize) {
+            dom.brushSize.value = autoBrushSize;
+            if (state.brush) state.brush.size = autoBrushSize;
+        }
+        if (dom.shapeStrokeWidth) {
+            dom.shapeStrokeWidth.value = autoShapeSize;
+            if (state.shapes) state.shapes.strokeWidth = autoShapeSize;
+        }
         
         autoZoomToFit(w, h);
         requestRender();
@@ -4026,28 +4040,48 @@ document.addEventListener("DOMContentLoaded", () => {
                 t.btn.classList.add("active");
                 state.activeTool = t.name;
                 
-                // Nascondi tutti i gruppi di opzioni
-                if (dom.brushSettings) dom.brushSettings.style.display = "none";
-                if (dom.eraserModeGroup) dom.eraserModeGroup.style.display = "none";
-                if (dom.magicWandSettingsGroup) dom.magicWandSettingsGroup.style.display = "none";
-                if (dom.shapesSettingsGroup) dom.shapesSettingsGroup.style.display = "none";
-                if (dom.lassoSettingsGroup) dom.lassoSettingsGroup.style.display = "none";
+                // Nascondi tutti i gruppi di opzioni e ripristina stile base
+                const settingsGroups = [dom.brushSettings, dom.eraserModeGroup, dom.magicWandSettingsGroup, dom.shapesSettingsGroup, dom.lassoSettingsGroup];
+                settingsGroups.forEach(g => {
+                    if (g) {
+                        g.style.display = "none";
+                    }
+                });
+
+                // Trova la griglia dei bottoni
+                const grid = t.btn.parentElement;
+                const allBtns = Array.from(grid.querySelectorAll('.tool-btn'));
+                
+                // Assegna un order fisso a tutti i bottoni nella griglia (10, 20, 30...)
+                allBtns.forEach((b, i) => {
+                    b.style.order = (i + 1) * 10;
+                });
+                
+                // Trova la posizione del bottone cliccato
+                const btnIndex = allBtns.indexOf(t.btn);
+                const rowIndex = Math.floor(btnIndex / 2);
+                const panelOrder = ((rowIndex * 2) + 2) * 10 + 5;
+                
+                const showPanel = (panel, offset = 0) => {
+                    if (!panel) return;
+                    panel.style.display = "block";
+                    panel.style.gridColumn = "1 / -1";
+                    panel.style.order = panelOrder + offset;
+                    if (panel.parentElement !== grid) grid.appendChild(panel);
+                };
 
                 // Mostra quello corretto in base allo strumento
-                if (t.name === "brush" || t.name === "eraser") {
-                    if (dom.brushSettings) dom.brushSettings.style.display = "block";
-                }
-                if (t.name === "eraser") {
-                    if (dom.eraserModeGroup) dom.eraserModeGroup.style.display = "block";
-                }
-                if (t.name === "magic_wand") {
-                    if (dom.magicWandSettingsGroup) dom.magicWandSettingsGroup.style.display = "block";
-                }
-                if (t.name === "shapes") {
-                    if (dom.shapesSettingsGroup) dom.shapesSettingsGroup.style.display = "block";
-                }
-                if (t.name === "lasso") {
-                    if (dom.lassoSettingsGroup) dom.lassoSettingsGroup.style.display = "block";
+                if (t.name === "brush") {
+                    showPanel(dom.brushSettings);
+                } else if (t.name === "eraser") {
+                    showPanel(dom.eraserModeGroup, 0);
+                    showPanel(dom.brushSettings, 1);
+                } else if (t.name === "magic_wand") {
+                    showPanel(dom.magicWandSettingsGroup);
+                } else if (t.name === "shapes") {
+                    showPanel(dom.shapesSettingsGroup);
+                } else if (t.name === "lasso") {
+                    showPanel(dom.lassoSettingsGroup);
                 }
 
                 requestRender();
@@ -4835,9 +4869,10 @@ document.addEventListener("DOMContentLoaded", () => {
                         state.activeFrameIndex = 0;
                     } else if (state.frames.length === 1 && state.frames[0]) {
                         const layers = state.frames[0].layers;
-                        if (layers.length === 0 || (layers.length === 1 && layers[0].name === "Testo Benvenuto")) {
+                        if (layers.length === 0 || layers.every(l => l.name === "Testo Benvenuto" || l.name === "Livello Scritta")) {
                             isFirstImport = true;
-                            state.frames[0].layers = []; // Rimuovi il testo di benvenuto
+                            // Rimuovi SOLO il testo di benvenuto, mantenendo eventuali scritte inserite dall'utente
+                            state.frames[0].layers = layers.filter(l => l.name !== "Testo Benvenuto");
                         }
                     }
 
@@ -4878,9 +4913,10 @@ document.addEventListener("DOMContentLoaded", () => {
                         keyframes: {}
                     };
                     addLayer(newLayer);
-                    // Centra la vista sull'immagine importata
-                    state.zoom = 1.0;
-                    setTimeout(centerCanvas, 80);
+                    // Centra la vista (senza sovrascrivere lo zoom che e' gia' stato calcolato)
+                    if (isFirstImport) {
+                        setTimeout(centerCanvas, 80);
+                    }
                 };
                 img.src = e.target.result;
             };
@@ -5113,8 +5149,7 @@ document.addEventListener("DOMContentLoaded", () => {
             
             dom.statusFramesCount.innerText = `1/${state.frames.length}`;
             
-            // Centra la vista
-            state.zoom = 1.0;
+            // Centra la vista (lo zoom proporzionale e' stato gia' calcolato da applyWorkspaceDimensions)
             setTimeout(centerCanvas, 100);
 
         } catch (err) {
