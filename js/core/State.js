@@ -5,6 +5,7 @@ export const state = {
         canvasHeight: 600,
         zoom: 1.0,
         gridActive: false,
+        autoAdaptGrid: true, // Flag per il pannello di debug tester
         
         // Sequenza delle immagini GIF
         frames: [
@@ -35,6 +36,28 @@ export const state = {
             isDrawing: false,
             lastX: 0,
             lastY: 0
+        },
+        shapes: {
+            type: "rect",
+            strokeColor: "#00ffcc",
+            strokeWidth: 2,
+            fillEnabled: false,
+            fillColor: "#1e1e24",
+            isDrawing: false,
+            startX: 0,
+            startY: 0,
+            currentX: 0,
+            currentY: 0
+        },
+        lasso: {
+            mode: "free",
+            isDrawing: false,
+            hasSelection: false,
+            points: [],
+            startX: 0,
+            startY: 0,
+            currentX: 0,
+            currentY: 0
         },
         
         // Riproduzione della GIF

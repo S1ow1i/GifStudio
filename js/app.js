@@ -2730,6 +2730,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Calcola lo zoom ottimale per inserire perfettamente il canvas all'interno del contenitore visibile
     function autoZoomToFit(w, h) {
+        if (state.autoAdaptGrid === false) {
+            adjustZoom(state.zoom);
+            setTimeout(centerCanvas, 10);
+            return;
+        }
         const containerW = dom.scrollContainer.clientWidth || 600;
         const containerH = dom.scrollContainer.clientHeight || 400;
         
@@ -3667,6 +3672,7 @@ document.addEventListener("DOMContentLoaded", () => {
             renderRequested = true;
             requestAnimationFrame(renderCanvas);
         }
+        if (window.updateDebugPanelUI) window.updateDebugPanelUI();
     }
 
     function renderCanvas() {
@@ -7996,7 +8002,109 @@ document.addEventListener("DOMContentLoaded", () => {
         }, true);
     }
 
+    // ======================================================================
+    // LOGICA PANNELLO DEBUG / TESTER
+    // ======================================================================
+    function initDebugPanel() {
+        const winDebug = document.getElementById('win-debug');
+        const btnCloseDebug = document.getElementById('btn-close-debug');
+        const autoAdaptCheck = document.getElementById('debug-auto-adapt');
+        const zoomSlider = document.getElementById('debug-zoom-slider');
+        const zoomInput = document.getElementById('debug-zoom-input');
+        const canvasW = document.getElementById('debug-canvas-w');
+        const canvasH = document.getElementById('debug-canvas-h');
+        const imgX = document.getElementById('debug-img-x');
+        const imgY = document.getElementById('debug-img-y');
+
+        if (!winDebug) return;
+
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.shiftKey && (e.key === 'D' || e.key === 'd')) {
+                e.preventDefault();
+                winDebug.style.display = winDebug.style.display === 'none' ? 'flex' : 'none';
+                if (window.updateDebugPanelUI) window.updateDebugPanelUI();
+            }
+        });
+
+        btnCloseDebug.addEventListener('click', () => {
+            winDebug.style.display = 'none';
+        });
+
+        autoAdaptCheck.addEventListener('change', (e) => {
+            state.autoAdaptGrid = e.target.checked;
+        });
+
+        zoomSlider.addEventListener('input', (e) => {
+            const z = parseFloat(e.target.value);
+            zoomInput.value = z.toFixed(1);
+            adjustZoom(z);
+        });
+
+        zoomInput.addEventListener('input', (e) => {
+            const z = parseFloat(e.target.value);
+            if(!isNaN(z)) {
+                zoomSlider.value = z;
+                adjustZoom(z);
+            }
+        });
+
+        canvasW.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value);
+            if(!isNaN(val)) {
+                applyWorkspaceDimensions(val, state.canvasHeight);
+            }
+        });
+
+        canvasH.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value);
+            if(!isNaN(val)) {
+                applyWorkspaceDimensions(state.canvasWidth, val);
+            }
+        });
+
+        imgX.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            if(!isNaN(val) && state.activeLayerId) {
+                const frame = state.frames[state.activeFrameIndex];
+                const layer = frame.layers.find(l => l.id === state.activeLayerId);
+                if (layer) { layer.x = val; requestRender(); }
+            }
+        });
+
+        imgY.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            if(!isNaN(val) && state.activeLayerId) {
+                const frame = state.frames[state.activeFrameIndex];
+                const layer = frame.layers.find(l => l.id === state.activeLayerId);
+                if (layer) { layer.y = val; requestRender(); }
+            }
+        });
+
+        window.updateDebugPanelUI = function() {
+            if (winDebug.style.display === 'none') return;
+            autoAdaptCheck.checked = state.autoAdaptGrid;
+            if(document.activeElement !== zoomSlider && document.activeElement !== zoomInput) {
+                zoomSlider.value = state.zoom;
+                zoomInput.value = state.zoom.toFixed(1);
+            }
+            if(document.activeElement !== canvasW) canvasW.value = state.canvasWidth;
+            if(document.activeElement !== canvasH) canvasH.value = state.canvasHeight;
+            
+            if (state.activeLayerId) {
+                const frame = state.frames[state.activeFrameIndex];
+                if(frame) {
+                    const layer = frame.layers.find(l => l.id === state.activeLayerId);
+                    if (layer) {
+                        if(document.activeElement !== imgX) imgX.value = Math.round(layer.x);
+                        if(document.activeElement !== imgY) imgY.value = Math.round(layer.y);
+                    }
+                }
+            }
+        };
+    }
+
     initTabOrderSystem();
     initInteractiveTutorial();
+    initDebugPanel();
     startApp();
 });
