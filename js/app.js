@@ -12,6 +12,28 @@ import { timelinePanel } from './panels/TimelinePanel.js';
 import { layerPanel } from './panels/LayerPanel.js';
 import { propertiesPanel } from './panels/PropertiesPanel.js';
 
+// Riferimenti condivisi del contesto moduli (ES Modules)
+import { context } from './core/Context.js';
+import { applyGlobalFilters, hexToRgb, rgbToHex } from './core/Filters.js';
+import { renderCanvas, drawGridLines } from './core/Renderer.js';
+import { 
+    applyKeyframesForTimelineFrame, 
+    interpolateLayerTransform, 
+    upsertKeyframeAtFrame, 
+    deleteKeyframeAtFrame, 
+    ensureLayerKeyframes, 
+    layerHasAnyKeyframes, 
+    frameHasAnyKeyframe, 
+    collectKeyframePropsFromLayer,
+    propagateLayerKeyframes,
+    deleteKeyframeAtCurrentFrame,
+    addKeyframeAtCurrentFrame,
+    toggleKeyframeAtFrame,
+    gotoAdjacentKeyframe,
+    maybeAutoRecordKeyframe,
+    findLayerInFrame
+} from './core/Timeline.js';
+
 /* ==========================================================================
    GIF STUDIO - LOGICA APPLICAZIONE & FUNZIONALITÀ INTERFACCIA
    ========================================================================== */
@@ -180,6 +202,24 @@ document.addEventListener("DOMContentLoaded", () => {
     // Cache temporanea per velocizzare il Chroma Key
     const filterCache = new Map();
 
+    // Inizializzazione del contesto condiviso per ES Modules
+    context.ctx = ctx;
+    context.filterCache = filterCache;
+    context.requestRender = requestRender;
+    context.saveState = saveState;
+    context.propagateLayerChanges = propagateLayerChanges;
+    context.buildTimelineUI = buildTimelineUI;
+    context.updateLayersListUI = updateLayersListUI;
+    context.updateXYZControlsUI = updateXYZControlsUI;
+    context.mapGlobalToLayerCoords = mapGlobalToLayerCoords;
+    context.getActiveFrame = getActiveFrame;
+    context.getActiveLayer = getActiveLayer;
+    context.syncCurrentFrameKeyframeFromLayer = syncCurrentFrameKeyframeFromLayer;
+    context.applyMagicWand = applyMagicWand;
+    context.createDrawingCanvasForLayer = createDrawingCanvasForLayer;
+    context.updateTransparentPickStatus = updateTransparentPickStatus;
+    context.resolveKeyframeTargetLayer = resolveKeyframeTargetLayer;
+
     // ======================================================================
     // 3. FUNZIONI UTILI DI SUPPORTO (HELPERS)
     // ======================================================================
@@ -302,7 +342,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function addTransparencyRuleFromUI() {
         const layer = getActiveLayer();
-        if (!layer || layer.isReference || layer.locked) {
+        if (!layer || layer.locked) {
             alert("Seleziona un livello immagine modificabile.");
             return false;
         }
@@ -1378,7 +1418,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!activeLayer) return;
         
         // Se lo scope è "frame" (singolo frame) e non stiamo forzando una modifica globale (es. Scritte), non facciamo nulla.
-        if (state.editScope === "frame" && !forceGlobal) {
+        // I livelli di riferimento (isReference) devono SEMPRE essere propagati a livello globale per rimanere allineati!
+        if (state.editScope === "frame" && !forceGlobal && !activeLayer.isReference) {
             return;
         }
 
@@ -1510,6 +1551,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 requestRender();
                 updateLayersListUI();
                 updateXYZControlsUI();
+                buildTimelineUI();
             };
             firstFrameImg.src = layer.gifFrames[0].toDataURL("image/png");
             layer.img = firstFrameImg;
@@ -2026,7 +2068,7 @@ document.addEventListener("DOMContentLoaded", () => {
         dom.transparencyRulesListBox.innerHTML = "";
         updateTransparentPickStatus();
 
-        if (!layer || layer.isReference || layer.locked) {
+        if (!layer || layer.locked) {
             clearTransparentPickStatus();
             dom.transparencyRulesListBox.innerHTML = `<div class="layer-warning">Seleziona un livello immagine modificabile.</div>`;
             return;
@@ -2322,7 +2364,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (existingIcon) {
                         existingIcon.outerHTML = `<span class="win-title-icon" style="margin-right:6px; display:inline-flex; align-items:center;">${svgIcon.replace('width="18"', 'width="14"').replace('height="18"', 'height="14"')}</span>`;
                     } else {
-                        let currentText = titleSpan.innerText;
+                        let currentText = titleSpan.textContent || titleSpan.innerText || "";
                         titleSpan.innerHTML = `<span class="win-title-icon" style="margin-right:6px; display:inline-flex; align-items:center;">${svgIcon.replace('width="18"', 'width="14"').replace('height="18"', 'height="14"')}</span>${currentText}`;
                     }
                 }
@@ -2331,7 +2373,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 btn.className = "launcher-btn";
                 if (win.style.display !== "none") btn.classList.add("active-launcher");
                 btn.setAttribute("data-target", win.id);
-                btn.title = `Mostra/Nascondi: ${titleSpan ? titleSpan.innerText.trim() : win.id}`;
+                btn.title = `Mostra/Nascondi: ${titleSpan ? (titleSpan.textContent || titleSpan.innerText || "").trim() : win.id}`;
                 btn.innerHTML = svgIcon;
                 
                 btn.addEventListener("click", () => {
@@ -3003,9 +3045,23 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    let initialGlobalEditLayer = null;
+
     function handleXYZInput(e) {
         const layer = getActiveLayer();
         if (!layer) return;
+
+        if (!initialGlobalEditLayer) {
+            initialGlobalEditLayer = {
+                x: layer.x,
+                y: layer.y,
+                w: layer.w,
+                h: layer.h,
+                r: layer.r,
+                z: layer.z,
+                opacity: layer.opacity
+            };
+        }
 
         const id = e.target.id;
         const val = parseFloat(e.target.value);
@@ -3086,6 +3142,45 @@ document.addEventListener("DOMContentLoaded", () => {
                 dom.xyzTextEndFrame.value = endVal;
             }
             layer.endFrame = endVal;
+        }
+
+        // Se siamo in modalità globale, calcoliamo le differenze geometriche e le propaghiamo a tutti i keyframe
+        if (state.editScope === "global" && layer.keyframes && Object.keys(layer.keyframes).length > 0 && initialGlobalEditLayer) {
+            const dx = (isNaN(layer.x) || isNaN(initialGlobalEditLayer.x)) ? 0 : layer.x - initialGlobalEditLayer.x;
+            const dy = (isNaN(layer.y) || isNaN(initialGlobalEditLayer.y)) ? 0 : layer.y - initialGlobalEditLayer.y;
+            const dr = (isNaN(layer.r) || isNaN(initialGlobalEditLayer.r)) ? 0 : layer.r - initialGlobalEditLayer.r;
+            const dz = (isNaN(layer.z) || isNaN(initialGlobalEditLayer.z)) ? 0 : layer.z - initialGlobalEditLayer.z;
+            const dOpacity = (isNaN(layer.opacity) || isNaN(initialGlobalEditLayer.opacity)) ? 0 : layer.opacity - initialGlobalEditLayer.opacity;
+            const scaleW = (isNaN(layer.w) || isNaN(initialGlobalEditLayer.w) || initialGlobalEditLayer.w <= 0) ? 1 : layer.w / initialGlobalEditLayer.w;
+            const scaleH = (isNaN(layer.h) || isNaN(initialGlobalEditLayer.h) || initialGlobalEditLayer.h <= 0) ? 1 : layer.h / initialGlobalEditLayer.h;
+
+            Object.keys(layer.keyframes).forEach(k => {
+                if (parseInt(k) === state.activeFrameIndex) return;
+                const kf = layer.keyframes[k];
+                if (dx !== 0 && kf.x !== undefined) kf.x = Math.round(kf.x + dx);
+                if (dy !== 0 && kf.y !== undefined) kf.y = Math.round(kf.y + dy);
+                if (dr !== 0 && kf.r !== undefined) {
+                    let nr = Math.round(kf.r + dr);
+                    nr = (nr % 360 + 360) % 360;
+                    if (nr > 180) nr -= 360;
+                    kf.r = nr;
+                }
+                if (dz !== 0 && kf.z !== undefined) kf.z = Math.max(1, kf.z + dz);
+                if (dOpacity !== 0 && kf.opacity !== undefined) kf.opacity = Math.max(0, Math.min(1, kf.opacity + dOpacity));
+                if (scaleW !== 1 && kf.w !== undefined) kf.w = Math.round(kf.w * scaleW);
+                if (scaleH !== 1 && kf.h !== undefined) kf.h = Math.round(kf.h * scaleH);
+            });
+
+            // Aggiorna l'oggetto di stato iniziale
+            initialGlobalEditLayer = {
+                x: layer.x,
+                y: layer.y,
+                w: layer.w,
+                h: layer.h,
+                r: layer.r,
+                z: layer.z,
+                opacity: layer.opacity
+            };
         }
 
         // Propaga geometricamente le modifiche (rispetta lo scope)
@@ -3309,578 +3404,21 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    function applyGlobalFilters(layer, sourceImg) {
-        const activeReplacements = (state.colorReplacements || []).filter(rep => {
-            if (rep.scope === "frame" && rep.targetLayerId && rep.targetLayerId !== layer.id) {
-                return false;
-            }
-            if (rep.scope === "global" && rep.targetLayerId) {
-                let sourceLayer = null;
-                for (const f of state.frames) {
-                    sourceLayer = f.layers.find(l => l.id === rep.targetLayerId);
-                    if (sourceLayer) break;
-                }
-                if (sourceLayer && !isHomologousLayer(layer, sourceLayer)) {
-                    return false;
-                }
-            }
-            return true;
-        });
-        const hasReplacements = activeReplacements.length > 0;
-        const hasBgRemove = !!layer.bgRemoveActive;
-        const hasTransparencyRules = layer.transparencyRules && layer.transparencyRules.length > 0;
-        
-        if (!hasReplacements && !hasBgRemove && !hasTransparencyRules) {
-            return sourceImg;
-        }
 
-        const cacheKey = getFilterCacheKey(layer, sourceImg);
-        
-        if (filterCache.has(cacheKey)) {
-            return filterCache.get(cacheKey);
-        }
+    // applyGlobalFilters è importata da ./core/Filters.js
 
-        const tempCanvas = document.createElement("canvas");
-        tempCanvas.width = layer.w;
-        tempCanvas.height = layer.h;
-        const tempCtx = tempCanvas.getContext("2d");
-        
-        tempCtx.drawImage(sourceImg, 0, 0, layer.w, layer.h);
-        
-        const imgData = tempCtx.getImageData(0, 0, layer.w, layer.h);
-        const data = imgData.data;
-        const width = Math.round(layer.w);
-        const height = Math.round(layer.h);
-
-        // 1. DELIMITAZIONE SOGGETTO CENTRALE & TRASPARENZA ESTERNA
-        if (hasBgRemove) {
-            const targetRgb = hexToRgb(layer.bgRemoveColor || "#ffffff");
-            const tol = layer.bgRemoveTolerance !== undefined ? layer.bgRemoveTolerance : 20;
-            const maxDist = tol * 1.73205;
-            
-            // A. BFS 1: Trova lo sfondo esterno contiguo (OuterBackground)
-            const visitedOuterBg = new Uint8Array(width * height);
-            const outerQueue = [];
-            
-            function isBackgroundPixel(x, y) {
-                if (x < 0 || x >= width || y < 0 || y >= height) return false;
-                const idx = (y * width + x) * 4;
-                if (data[idx + 3] === 0) return true; // Già trasparente è considerato sfondo
-                
-                const r = data[idx];
-                const g = data[idx + 1];
-                const b = data[idx + 2];
-                
-                const dr = r - targetRgb.r;
-                const dg = g - targetRgb.g;
-                const db = b - targetRgb.b;
-                const dist = Math.sqrt(dr * dr + dg * dg + db * db);
-                
-                return dist <= maxDist;
-            }
-            
-            // Inserisci i semi per lo sfondo esterno
-            let hasSeed = false;
-            if (layer.bgRemoveSeedX !== null && layer.bgRemoveSeedY !== null && layer.bgRemoveSeedX !== undefined) {
-                const seedX = Math.round(layer.bgRemoveSeedX);
-                const seedY = Math.round(layer.bgRemoveSeedY);
-                if (isBackgroundPixel(seedX, seedY)) {
-                    const startPos = seedY * width + seedX;
-                    visitedOuterBg[startPos] = 1;
-                    outerQueue.push(startPos);
-                    hasSeed = true;
-                }
-            }
-            
-            // Se non c'è un seme cliccato valido, usiamo tutti i bordi dell'immagine come semi di sfondo
-            if (!hasSeed) {
-                // Righe superiore e inferiore
-                for (let x = 0; x < width; x++) {
-                    if (isBackgroundPixel(x, 0)) {
-                        const pos = x;
-                        if (!visitedOuterBg[pos]) {
-                            visitedOuterBg[pos] = 1;
-                            outerQueue.push(pos);
-                        }
-                    }
-                    if (isBackgroundPixel(x, height - 1)) {
-                        const pos = (height - 1) * width + x;
-                        if (!visitedOuterBg[pos]) {
-                            visitedOuterBg[pos] = 1;
-                            outerQueue.push(pos);
-                        }
-                    }
-                }
-                // Colonne sinistra e destra
-                for (let y = 0; y < height; y++) {
-                    if (isBackgroundPixel(0, y)) {
-                        const pos = y * width;
-                        if (!visitedOuterBg[pos]) {
-                            visitedOuterBg[pos] = 1;
-                            outerQueue.push(pos);
-                        }
-                    }
-                    if (isBackgroundPixel(width - 1, y)) {
-                        const pos = y * width + (width - 1);
-                        if (!visitedOuterBg[pos]) {
-                            visitedOuterBg[pos] = 1;
-                            outerQueue.push(pos);
-                        }
-                    }
-                }
-            }
-            
-            // Esegui la prima BFS per diffondere lo sfondo esterno
-            let outerHead = 0;
-            const dx = [-1, 1, 0, 0];
-            const dy = [0, 0, -1, 1];
-            
-            while (outerHead < outerQueue.length) {
-                const pos = outerQueue[outerHead++];
-                const currX = pos % width;
-                const currY = Math.floor(pos / width);
-                
-                for (let d = 0; d < 4; d++) {
-                    const nx = currX + dx[d];
-                    const ny = currY + dy[d];
-                    if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-                        const nPos = ny * width + nx;
-                        if (!visitedOuterBg[nPos]) {
-                            if (isBackgroundPixel(nx, ny)) {
-                                visitedOuterBg[nPos] = 1;
-                                outerQueue.push(nPos);
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // B. BFS 2: Trova il soggetto principale (MainSubject) partendo dal centro
-            const visitedSubject = new Uint8Array(width * height);
-            const subjectQueue = [];
-            
-            const centerX = Math.floor(width / 2);
-            const centerY = Math.floor(height / 2);
-            
-            // Un pixel fa parte del soggetto se NON è parte dello sfondo esterno (visitedOuterBg === 0)
-            function isSubjectCandidate(x, y) {
-                if (x < 0 || x >= width || y < 0 || y >= height) return false;
-                const idx = y * width + x;
-                return visitedOuterBg[idx] === 0;
-            }
-            
-            let startX = centerX;
-            let startY = centerY;
-            let foundSeed = false;
-            
-            if (isSubjectCandidate(centerX, centerY)) {
-                foundSeed = true;
-            } else {
-                const maxRadius = Math.max(width, height);
-                for (let r = 1; r < maxRadius && !foundSeed; r++) {
-                    for (let i = -r; i <= r && !foundSeed; i++) {
-                        // Righe superiore e inferiore
-                        if (isSubjectCandidate(centerX + i, centerY - r)) {
-                            startX = centerX + i;
-                            startY = centerY - r;
-                            foundSeed = true;
-                        } else if (isSubjectCandidate(centerX + i, centerY + r)) {
-                            startX = centerX + i;
-                            startY = centerY + r;
-                            foundSeed = true;
-                        }
-                        // Colonne sinistra e destra
-                        else if (isSubjectCandidate(centerX - r, centerY + i)) {
-                            startX = centerX - r;
-                            startY = centerY + i;
-                            foundSeed = true;
-                        } else if (isSubjectCandidate(centerX + r, centerY + i)) {
-                            startX = centerX + r;
-                            startY = centerY + i;
-                            foundSeed = true;
-                        }
-                    }
-                }
-            }
-            
-            // Se abbiamo trovato il seme del soggetto principale, eseguiamo il tracciamento
-            if (foundSeed) {
-                const startPos = startY * width + startX;
-                visitedSubject[startPos] = 1;
-                subjectQueue.push(startPos);
-                
-                let subjectHead = 0;
-                while (subjectHead < subjectQueue.length) {
-                    const pos = subjectQueue[subjectHead++];
-                    const currX = pos % width;
-                    const currY = Math.floor(pos / width);
-                    
-                    for (let d = 0; d < 4; d++) {
-                        const nx = currX + dx[d];
-                        const ny = currY + dy[d];
-                        if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-                            const nPos = ny * width + nx;
-                            if (!visitedSubject[nPos]) {
-                                if (isSubjectCandidate(nx, ny)) {
-                                    visitedSubject[nPos] = 1;
-                                    subjectQueue.push(nPos);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // C. Rendi trasparente tutto ciò che NON è stato visitato come Soggetto Principale
-            for (let y = 0; y < height; y++) {
-                for (let x = 0; x < width; x++) {
-                    const pos = y * width + x;
-                    if (visitedSubject[pos] === 0) {
-                        const idx = pos * 4;
-                        data[idx + 3] = 0; // Trasparente
-                    }
-                }
-            }
-        }
-        const replacements = activeReplacements.map(rep => {
-            return {
-                type: rep.type,
-                fromRgb: hexToRgb(rep.from),
-                toRgb: hexToRgb(rep.to),
-                tolerance: rep.tolerance !== undefined ? rep.tolerance : 20,
-                makeTransparent: !!rep.transparent,
-                seedX: rep.seedX,
-                seedY: rep.seedY
-            };
-        });
-
-        if (hasTransparencyRules) {
-            layer.transparencyRules.forEach((rule) => {
-                applyTransparencyRuleToImageData(data, width, height, rule);
-            });
-        }
-
-
-
-        // 2. SOSTITUZIONE COLORE E BOMBA ISOLA (ELIMINA A CATENA)
-        if (hasReplacements) {
-            const width = Math.round(layer.w);
-            const height = Math.round(layer.h);
-            
-            replacements.forEach(rep => {
-                if (rep.type === "chain-erase") {
-                    // Flood fill distruttivo (cieco ai colori)
-                    if (rep.seedX === null || rep.seedY === null || rep.seedX === undefined) return;
-                    const visited = new Uint8Array(width * height);
-                    const queue = [];
-                    const startX = Math.round(rep.seedX);
-                    const startY = Math.round(rep.seedY);
-                    
-                    if (startX >= 0 && startX < width && startY >= 0 && startY < height) {
-                        const startPos = startY * width + startX;
-                        // Verifica che il seme colpisca un pixel opaco
-                        if (data[startPos * 4 + 3] > 0) {
-                            visited[startPos] = 1;
-                            queue.push(startPos);
-                            data[startPos * 4 + 3] = 0; // Cancella
-                        }
-                    }
-                    
-                    let head = 0;
-                    const dx = [-1, 1, 0, 0];
-                    const dy = [0, 0, -1, 1];
-                    
-                    while (head < queue.length) {
-                        const pos = queue[head++];
-                        const currX = pos % width;
-                        const currY = Math.floor(pos / width);
-                        
-                        for (let d = 0; d < 4; d++) {
-                            const nx = currX + dx[d];
-                            const ny = currY + dy[d];
-                            if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-                                const nPos = ny * width + nx;
-                                if (!visited[nPos]) {
-                                    visited[nPos] = 1;
-                                    // Se il pixel è opaco, lo distrugge e propaga
-                                    if (data[nPos * 4 + 3] > 0) {
-                                        data[nPos * 4 + 3] = 0;
-                                        queue.push(nPos);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } else if (rep.seedX !== null && rep.seedY !== null && rep.seedX !== undefined) {
-                    // Flood fill dallo spazio confinante (seed)
-                    const visited = new Uint8Array(width * height);
-                    const queue = [];
-                    const startX = Math.round(rep.seedX);
-                    const startY = Math.round(rep.seedY);
-                    
-                    if (startX >= 0 && startX < width && startY >= 0 && startY < height) {
-                        const startPos = startY * width + startX;
-                        visited[startPos] = 1;
-                        queue.push(startPos);
-                    }
-                    
-                    let head = 0;
-                    const dx = [-1, 1, 0, 0];
-                    const dy = [0, 0, -1, 1];
-                    
-                    while (head < queue.length) {
-                        const pos = queue[head++];
-                        const currX = pos % width;
-                        const currY = Math.floor(pos / width);
-                        const idx = pos * 4;
-                        
-                        if (data[idx + 3] > 0) {
-                            const diffR = data[idx] - rep.fromRgb.r;
-                            const diffG = data[idx + 1] - rep.fromRgb.g;
-                            const diffB = data[idx + 2] - rep.fromRgb.b;
-                            if (Math.sqrt(diffR * diffR + diffG * diffG + diffB * diffB) <= (rep.tolerance * 1.73205)) {
-                                // Match! Sostituisci
-                                if (rep.makeTransparent) {
-                                    data[idx + 3] = 0;
-                                } else {
-                                    data[idx] = rep.toRgb.r;
-                                    data[idx + 1] = rep.toRgb.g;
-                                    data[idx + 2] = rep.toRgb.b;
-                                    data[idx + 3] = 255;
-                                }
-                                
-                                // Espandi ai vicini
-                                for (let d = 0; d < 4; d++) {
-                                    const nx = currX + dx[d];
-                                    const ny = currY + dy[d];
-                                    if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-                                        const nPos = ny * width + nx;
-                                        if (!visited[nPos]) {
-                                            visited[nPos] = 1;
-                                            queue.push(nPos);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    // Sostituzione globale (fallback se non c'è click pipetta)
-                    for (let i = 0; i < data.length; i += 4) {
-                        if (data[i + 3] === 0) continue;
-                        const diffR = data[i] - rep.fromRgb.r;
-                        const diffG = data[i + 1] - rep.fromRgb.g;
-                        const diffB = data[i + 2] - rep.fromRgb.b;
-                        if (Math.sqrt(diffR * diffR + diffG * diffG + diffB * diffB) <= (rep.tolerance * 1.73205)) {
-                            if (rep.makeTransparent) {
-                                data[i + 3] = 0;
-                            } else {
-                                data[i] = rep.toRgb.r;
-                                data[i + 1] = rep.toRgb.g;
-                                data[i + 2] = rep.toRgb.b;
-                                data[i + 3] = 255;
-                            }
-                        }
-                    }
-                }
-            });
-        }
-
-        tempCtx.putImageData(imgData, 0, 0);
-        filterCache.set(cacheKey, tempCanvas);
-        return tempCanvas;
-    }
-
-    // ======================================================================
-    // 10. RENDERING LOOP & GRAFICA DEL CANVAS
-    // ======================================================================
-    let renderRequested = false;
 
     function requestRender() {
-        if (!renderRequested) {
-            renderRequested = true;
+        if (!context.renderRequested) {
+            context.renderRequested = true;
             requestAnimationFrame(renderCanvas);
         }
         if (window.updateDebugPanelUI) window.updateDebugPanelUI();
     }
 
-    function renderCanvas() {
-        renderRequested = false;
-        
-        ctx.clearRect(0, 0, state.canvasWidth, state.canvasHeight);
-        
-        const frame = getActiveFrame();
-        if (!frame) return;
 
-        frame.layers.forEach(layer => {
-            if (!layer.visible) return;
+    // renderCanvas, drawGridLines, varColorToHex sono importate da ./core/Renderer.js
 
-            // Inibizione temporale per le scritte o per i livelli di riferimento (Da Frame / A Frame)
-            if (layer.type === "text" || layer.isReference === true) {
-                const currentFrameNum = state.activeFrameIndex + 1;
-                const startF = layer.startFrame !== undefined ? layer.startFrame : 1;
-                const endF = layer.endFrame !== undefined ? layer.endFrame : state.frames.length;
-                if (currentFrameNum < startF || currentFrameNum > endF) {
-                    return;
-                }
-            }
-
-            ctx.save();
-            ctx.globalAlpha = layer.opacity !== undefined ? layer.opacity : 1.0;
-            ctx.translate(layer.x + layer.w / 2, layer.y + layer.h / 2);
-            ctx.rotate((layer.r * Math.PI) / 180);
-            
-            if (layer.type === "image" && (layer.isAnimatedGif && layer.gifFrames && layer.gifFrames.length > 0)) {
-                const refFrameIdx = state.activeFrameIndex % layer.gifFrames.length;
-                const activeFrameCanvas = layer.gifFrames[refFrameIdx];
-                let renderSource = applyGlobalFilters(layer, activeFrameCanvas);
-
-                if (layer.borderRadius > 0) {
-                    ctx.save();
-                    ctx.beginPath();
-                    const radius = Math.min(layer.borderRadius, layer.w / 2, layer.h / 2);
-                    ctx.roundRect(-layer.w / 2, -layer.h / 2, layer.w, layer.h, radius);
-                    ctx.clip();
-                    ctx.drawImage(renderSource, -layer.w / 2, -layer.h / 2, layer.w, layer.h);
-                    ctx.restore();
-                } else {
-                    ctx.drawImage(renderSource, -layer.w / 2, -layer.h / 2, layer.w, layer.h);
-                }
-            }
-            else if (layer.type === "image" && (layer.canvasImage || layer.img)) {
-                let renderSource = applyGlobalFilters(layer, layer.canvasImage || layer.img);
-
-                if (layer.borderRadius > 0) {
-                    ctx.save();
-                    ctx.beginPath();
-                    const radius = Math.min(layer.borderRadius, layer.w / 2, layer.h / 2);
-                    ctx.roundRect(-layer.w / 2, -layer.h / 2, layer.w, layer.h, radius);
-                    ctx.clip();
-                    ctx.drawImage(renderSource, -layer.w / 2, -layer.h / 2, layer.w, layer.h);
-                    ctx.restore();
-                } else {
-                    ctx.drawImage(renderSource, -layer.w / 2, -layer.h / 2, layer.w, layer.h);
-                }
-            } 
-            else if (layer.type === "text") {
-                ctx.font = `${layer.fontSize}px ${layer.fontFamily}`;
-                ctx.fillStyle = layer.fontColor;
-                ctx.textAlign = "center";
-                ctx.textBaseline = "middle";
-                
-                if (layer.borderRadius > 0) {
-                    ctx.save();
-                    ctx.fillStyle = "rgba(0,0,0,0.15)";
-                    ctx.beginPath();
-                    ctx.roundRect(-layer.w/2, -layer.h/2, layer.w, layer.h, layer.borderRadius);
-                    ctx.fill();
-                    ctx.restore();
-                }
-                
-                ctx.fillText(layer.text, 0, 0);
-            }
-
-            // Disegna disegni manuali su questo layer
-            if (layer.drawingCanvas) {
-                ctx.drawImage(layer.drawingCanvas, -layer.w / 2, -layer.h / 2, layer.w, layer.h);
-            }
-
-            // Disegna maschera di protezione (visiva)
-            if (layer.protectionMask) {
-                ctx.save();
-                ctx.globalAlpha = 0.4;
-                ctx.drawImage(layer.protectionMask, -layer.w / 2, -layer.h / 2, layer.w, layer.h);
-                ctx.restore();
-            }
-
-            // Disegna rettangolo di selezione in modalità select
-            if (layer.id === state.activeLayerId && state.activeTool === "select") {
-                ctx.strokeStyle = varColorToHex("--accent-color", "#00ffcc");
-                ctx.lineWidth = 1.8 / state.zoom;
-                ctx.strokeRect(-layer.w / 2 - 2, -layer.h / 2 - 2, layer.w + 4, layer.h + 4);
-                
-                ctx.fillStyle = "#ffffff";
-                const handleSz = 6 / state.zoom;
-                ctx.fillRect(-layer.w / 2 - handleSz/2, -layer.h / 2 - handleSz/2, handleSz, handleSz);
-                ctx.fillRect(layer.w / 2 - handleSz/2, -layer.h / 2 - handleSz/2, handleSz, handleSz);
-                ctx.fillRect(-layer.w / 2 - handleSz/2, layer.h / 2 - handleSz/2, handleSz, handleSz);
-                ctx.fillRect(layer.w / 2 - handleSz/2, layer.h / 2 - handleSz/2, handleSz, handleSz);
-            }
-            
-            ctx.restore();
-        });
-
-        // Anteprima Forme Geometriche in Tempo Reale
-        if (state.activeTool === "shapes" && state.shapes.isDrawing) {
-            ctx.save();
-            ctx.strokeStyle = state.shapes.strokeColor;
-            ctx.lineWidth = state.shapes.strokeWidth;
-            if (state.shapes.fillEnabled) ctx.fillStyle = state.shapes.fillColor;
-            
-            const sx = state.shapes.startX;
-            const sy = state.shapes.startY;
-            const ex = state.shapes.currentX;
-            const ey = state.shapes.currentY;
-            
-            ctx.beginPath();
-            if (state.shapes.type === "rect") {
-                const w = ex - sx;
-                const h = ey - sy;
-                if (state.shapes.fillEnabled) ctx.fillRect(sx, sy, w, h);
-                if (state.shapes.strokeWidth > 0) ctx.strokeRect(sx, sy, w, h);
-            } else if (state.shapes.type === "circle") {
-                const minX = Math.min(sx, ex);
-                const minY = Math.min(sy, ey);
-                const w = Math.abs(ex - sx) || 1;
-                const h = Math.abs(ey - sy) || 1;
-                const rx = w / 2;
-                const ry = h / 2;
-                ctx.ellipse(minX + rx, minY + ry, rx, ry, 0, 0, Math.PI * 2);
-                if (state.shapes.fillEnabled) ctx.fill();
-                if (state.shapes.strokeWidth > 0) ctx.stroke();
-            } else if (state.shapes.type === "line") {
-                ctx.moveTo(sx, sy);
-                ctx.lineTo(ex, ey);
-                if (state.shapes.strokeWidth > 0) ctx.stroke();
-            }
-            ctx.restore();
-        }
-
-        if (state.gridActive) {
-            drawGridLines();
-        }
-    }
-
-    function drawGridLines() {
-        ctx.save();
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.06)";
-        ctx.lineWidth = 0.8 / state.zoom;
-        
-        const minDim = Math.min(state.canvasWidth, state.canvasHeight);
-        let gridSize = 20;
-        if (minDim <= 64) gridSize = 10;
-        else if (minDim >= 1000) gridSize = 40;
-        
-        for (let x = 0; x < state.canvasWidth; x += gridSize) {
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, state.canvasHeight);
-            ctx.stroke();
-        }
-        for (let y = 0; y < state.canvasHeight; y += gridSize) {
-            ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(state.canvasWidth, y);
-            ctx.stroke();
-        }
-        ctx.restore();
-    }
-
-    function varColorToHex(varName, fallback) {
-        const style = getComputedStyle(document.documentElement);
-        const val = style.getPropertyValue(varName).trim();
-        return val || fallback;
-    }
 
     // ======================================================================
     // 11. STRUMENTI DI DISEGNO pixel-by-pixel (Pennello/Gomma)
@@ -3925,13 +3463,117 @@ document.addEventListener("DOMContentLoaded", () => {
             state.lasso.mode = "free";
             dom.lassoModeFree.classList.add("active");
             dom.lassoModeRect.classList.remove("active");
+            if (dom.lassoModeCircle) dom.lassoModeCircle.classList.remove("active");
         });
         dom.lassoModeRect.addEventListener("click", () => {
             state.lasso.mode = "rect";
             dom.lassoModeRect.classList.add("active");
             dom.lassoModeFree.classList.remove("active");
+            if (dom.lassoModeCircle) dom.lassoModeCircle.classList.remove("active");
         });
+        if (dom.lassoModeCircle) {
+            dom.lassoModeCircle.addEventListener("click", () => {
+                state.lasso.mode = "circle";
+                dom.lassoModeCircle.classList.add("active");
+                dom.lassoModeFree.classList.remove("active");
+                dom.lassoModeRect.classList.remove("active");
+            });
+        }
         
+        // Funzioni Helper Condivise per lo Strumento Lazo (Taglio e Pulisci)
+        function buildLassoPath(ctx2d, offsetX, offsetY) {
+            ctx2d.beginPath();
+            if (state.lasso.ellipse) {
+                const e = state.lasso.ellipse;
+                ctx2d.ellipse(
+                    e.cx - offsetX,
+                    e.cy - offsetY,
+                    e.rx, e.ry,
+                    0, 0, Math.PI * 2
+                );
+            } else if (state.lasso.points && state.lasso.points.length > 0) {
+                state.lasso.points.forEach((p, i) => {
+                    const lx = p.x - offsetX;
+                    const ly = p.y - offsetY;
+                    if (i === 0) ctx2d.moveTo(lx, ly);
+                    else ctx2d.lineTo(lx, ly);
+                });
+                ctx2d.closePath();
+            }
+        }
+
+        function executeLassoClear() {
+            if (!state.lasso.hasSelection || state.lasso.points.length < 3) return;
+            const layer = getActiveLayer();
+            if (!layer || layer.locked) return;
+            saveState();
+
+            const renderSource_clear = layer.canvasImage || layer.img || layer.drawingCanvas;
+            if (renderSource_clear) {
+                const renderSource = typeof applyGlobalFilters === "function" ? applyGlobalFilters(layer, renderSource_clear) : renderSource_clear;
+                if (!layer.drawingCanvas) {
+                    layer.drawingCanvas = createDrawingCanvasForLayer(layer.w, layer.h);
+                    const dCtx = layer.drawingCanvas.getContext("2d");
+                    dCtx.drawImage(renderSource, 0, 0, layer.w, layer.h);
+                    layer.canvasImage = layer.drawingCanvas;
+                    layer.img = null;
+                }
+                const lCtx = layer.drawingCanvas.getContext("2d");
+                lCtx.save();
+                lCtx.globalCompositeOperation = "destination-out";
+                const layerOffsetX = (layer.x + layer.w / 2) - layer.w / 2;
+                const layerOffsetY = (layer.y + layer.h / 2) - layer.h / 2;
+                buildLassoPath(lCtx, layerOffsetX, layerOffsetY);
+                lCtx.fill();
+                lCtx.restore();
+            }
+
+            if (typeof filterCache !== "undefined" && filterCache.clear) {
+                filterCache.clear();
+            }
+            if (typeof context !== "undefined" && context.filterCache && typeof context.filterCache.clear === "function") {
+                context.filterCache.clear();
+            }
+            state.lasso.hasSelection = false;
+            state.lasso.points = [];
+            state.lasso.ellipse = null;
+            requestRender();
+            if (typeof renderLayers === "function") renderLayers();
+            updateLayersListUI();
+            updateLassoActionButtons();
+        }
+
+        function updateLassoActionButtons() {
+            const hasSel = state.lasso.hasSelection && state.lasso.points.length >= 3;
+            
+            // Abilitazione/Disabilitazione pulsante TAGLIO
+            if (dom.btnLassoCut) {
+                dom.btnLassoCut.disabled = !hasSel;
+            }
+            
+            // Abilitazione/Disabilitazione/Highlight pulsante PULISCI
+            if (dom.btnLassoClear) {
+                if (hasSel) {
+                    dom.btnLassoClear.disabled = false;
+                    dom.btnLassoClear.classList.remove("inactive");
+                    dom.btnLassoClear.classList.remove("active");
+                } else {
+                    dom.btnLassoClear.disabled = false; // abilitato per permettere click toggle mode!
+                    if (state.lasso.clearMode) {
+                        dom.btnLassoClear.classList.add("active");
+                        dom.btnLassoClear.classList.remove("inactive");
+                    } else {
+                        dom.btnLassoClear.classList.add("inactive");
+                        dom.btnLassoClear.classList.remove("active");
+                    }
+                }
+            }
+        }
+
+        // Esponi per uso all'interno delle funzioni di disegno
+        window.updateLassoActionButtons = updateLassoActionButtons;
+        window.executeLassoClear = executeLassoClear;
+
         dom.btnLassoCut.addEventListener("click", () => {
             if (!state.lasso.hasSelection || state.lasso.points.length < 3) return;
             const layer = getActiveLayer();
@@ -3954,20 +3596,14 @@ document.addEventListener("DOMContentLoaded", () => {
             cutCanvas.height = h;
             const cCtx = cutCanvas.getContext("2d");
 
-            cCtx.beginPath();
-            state.lasso.points.forEach((p, i) => {
-                const lx = p.x - minX;
-                const ly = p.y - minY;
-                if (i === 0) cCtx.moveTo(lx, ly);
-                else cCtx.lineTo(lx, ly);
-            });
-            cCtx.closePath();
+            buildLassoPath(cCtx, minX, minY);
             cCtx.clip();
 
-            if (layer.canvasImage || layer.img) {
-                const renderSource = typeof applyGlobalFilters === "function" ? applyGlobalFilters(layer, layer.canvasImage || layer.img) : (layer.canvasImage || layer.img);
-                const localMinX = minX - (layer.x + layer.w / 2);
-                const localMinY = minY - (layer.y + layer.h / 2);
+            const renderSource_img = layer.canvasImage || layer.img || layer.drawingCanvas;
+            if (renderSource_img) {
+                const renderSource = typeof applyGlobalFilters === "function" ? applyGlobalFilters(layer, renderSource_img) : renderSource_img;
+                const localMinX = minX - layer.x;
+                const localMinY = minY - layer.y;
                 
                 cCtx.save();
                 cCtx.translate(-localMinX, -localMinY);
@@ -3984,14 +3620,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 const lCtx = layer.drawingCanvas.getContext("2d");
                 lCtx.save();
                 lCtx.globalCompositeOperation = "destination-out";
-                lCtx.beginPath();
-                state.lasso.points.forEach((p, i) => {
-                    const lx = p.x - (layer.x + layer.w / 2) + layer.w / 2;
-                    const ly = p.y - (layer.y + layer.h / 2) + layer.h / 2;
-                    if (i === 0) lCtx.moveTo(lx, ly);
-                    else lCtx.lineTo(lx, ly);
-                });
-                lCtx.closePath();
+                const layerOffsetX = (layer.x + layer.w / 2) - layer.w / 2;
+                const layerOffsetY = (layer.y + layer.h / 2) - layer.h / 2;
+                buildLassoPath(lCtx, layerOffsetX, layerOffsetY);
                 lCtx.fill();
                 lCtx.restore();
             }
@@ -4014,48 +3645,49 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const frame = state.frames[state.activeFrameIndex];
             if (frame) {
-                frame.layers.push(newLayer);
+                const idx = frame.layers.indexOf(layer);
+                const targetZ = (layer.z || 0) + 1;
+                // Sposta in alto tutti i livelli sopra il livello target
+                frame.layers.forEach(l => {
+                    if (l.z >= targetZ) {
+                        l.z = l.z + 1;
+                    }
+                });
+                newLayer.z = targetZ;
+                if (idx !== -1) {
+                    // Inserisci direttamente sopra il livello principale nel vettore
+                    frame.layers.splice(idx + 1, 0, newLayer);
+                } else {
+                    frame.layers.push(newLayer);
+                }
+            }
+
+            if (typeof filterCache !== "undefined" && filterCache.clear) {
+                filterCache.clear();
+            }
+            if (typeof context !== "undefined" && context.filterCache && typeof context.filterCache.clear === "function") {
+                context.filterCache.clear();
             }
             state.lasso.hasSelection = false;
             state.lasso.points = [];
+            state.lasso.ellipse = null;
+            state.lasso.clearMode = false; // Disattiva il toggle
             state.activeLayerId = newLayer.id;
             requestRender();
             if (typeof renderLayers === "function") renderLayers();
             updateLayersListUI();
+            updateLassoActionButtons();
         });
 
         dom.btnLassoClear.addEventListener("click", () => {
-            if (!state.lasso.hasSelection || state.lasso.points.length < 3) return;
-            const layer = getActiveLayer();
-            if (!layer || layer.locked) return;
-            saveState();
-
-            if (layer.canvasImage || layer.img) {
-                const renderSource = typeof applyGlobalFilters === "function" ? applyGlobalFilters(layer, layer.canvasImage || layer.img) : (layer.canvasImage || layer.img);
-                if (!layer.drawingCanvas) {
-                    layer.drawingCanvas = createDrawingCanvasForLayer(layer.w, layer.h);
-                    const dCtx = layer.drawingCanvas.getContext("2d");
-                    dCtx.drawImage(renderSource, 0, 0, layer.w, layer.h);
-                    layer.canvasImage = layer.drawingCanvas;
-                    layer.img = null;
-                }
-                const lCtx = layer.drawingCanvas.getContext("2d");
-                lCtx.save();
-                lCtx.globalCompositeOperation = "destination-out";
-                lCtx.beginPath();
-                state.lasso.points.forEach((p, i) => {
-                    const lx = p.x - (layer.x + layer.w / 2) + layer.w / 2;
-                    const ly = p.y - (layer.y + layer.h / 2) + layer.h / 2;
-                    if (i === 0) lCtx.moveTo(lx, ly);
-                    else lCtx.lineTo(lx, ly);
-                });
-                lCtx.closePath();
-                lCtx.fill();
-                lCtx.restore();
+            if (state.lasso.hasSelection && state.lasso.points.length >= 3) {
+                executeLassoClear();
+                state.lasso.clearMode = false; // Disattiva il toggle al completamento
+                updateLassoActionButtons();
+            } else {
+                state.lasso.clearMode = !state.lasso.clearMode;
+                updateLassoActionButtons();
             }
-            state.lasso.hasSelection = false;
-            state.lasso.points = [];
-            requestRender();
         });
     }
 
@@ -4118,6 +3750,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     showPanel(dom.shapesSettingsGroup);
                 } else if (t.name === "lasso") {
                     showPanel(dom.lassoSettingsGroup);
+                    if (typeof window.updateLassoActionButtons === "function") {
+                        window.updateLassoActionButtons();
+                    }
                 }
 
                 requestRender();
@@ -4187,8 +3822,52 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         dom.mainCanvas.addEventListener("mousedown", startDrawing);
+
+        dom.mainCanvas.addEventListener("mousemove", (e) => {
+            if (state.activeTool !== "select" || (state.transform && state.transform.isTransforming) || state.isDragging) return;
+
+            const coords = getCoordsOnCanvas(e);
+            const activeLayer = getActiveLayer();
+            if (!activeLayer) {
+                dom.mainCanvas.style.cursor = "default";
+                return;
+            }
+
+            const handle = checkSelectHandle(coords.x, coords.y, activeLayer);
+            if (handle) {
+                if (handle.type === "resize") {
+                    if (handle.corner === "tl" || handle.corner === "br") {
+                        dom.mainCanvas.style.cursor = "nwse-resize";
+                    } else {
+                        dom.mainCanvas.style.cursor = "nesw-resize";
+                    }
+                } else if (handle.type === "rotate") {
+                    dom.mainCanvas.style.cursor = "grab";
+                }
+            } else {
+                const local = mapGlobalToLayerCoords(coords.x, coords.y, activeLayer);
+                if (local.x >= 0 && local.x <= activeLayer.w && local.y >= 0 && local.y <= activeLayer.h) {
+                    if (state.transform && state.transform.dragLayerId === activeLayer.id) {
+                        dom.mainCanvas.style.cursor = "move";
+                    } else {
+                        dom.mainCanvas.style.cursor = "pointer";
+                    }
+                } else {
+                    dom.mainCanvas.style.cursor = "default";
+                }
+            }
+        });
+
+        dom.mainCanvas.addEventListener("mouseleave", () => {
+            dom.mainCanvas.style.cursor = "default";
+        });
         document.addEventListener("mousemove", drawMove);
         document.addEventListener("mouseup", stopDrawing);
+        
+        // Inizializza lo stato dei bottoni d'azione del lazo
+        if (typeof window.updateLassoActionButtons === "function") {
+            window.updateLassoActionButtons();
+        }
     }
 
     function getCoordsOnCanvas(e) {
@@ -4199,19 +3878,101 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function startDrawing(e) {
-        const coords = getCoordsOnCanvas(e);
+        if (state.activeTool === "select") {
+            handleCanvasSelect(e);
+            return;
+        }
+
         const layer = getActiveLayer();
         if (!layer) return;
 
-        if (state.activeTool === "select") {
-            selectTool.onMouseMove(coords, layer, requestRender);
+        const coords = getCoordsOnCanvas(e);
+
+        // LOGICA STRUMENTO PIPETTA E SMISTAMENTO COLORE
+        if (state.activeTool === "picker") {
+            const pixel = ctx.getImageData(coords.x, coords.y, 1, 1).data;
+            const hex = rgbToHex(pixel[0], pixel[1], pixel[2]);
+            
+            if (state.colorPickerTarget === "brush") {
+                state.brush.color = hex;
+                if (dom.brushColor) dom.brushColor.value = hex;
+            } else if (state.colorPickerTarget === "chroma") {
+                if (dom.chromaColor) dom.chromaColor.value = hex;
+                if (layer) {
+                    saveState();
+                    layer.chromaColor = hex;
+                    filterCache.delete(layer.id);
+                }
+            } else if (state.colorPickerTarget === "replace-from") {
+                if (dom.replaceColorFrom) dom.replaceColorFrom.value = hex;
+                const localCoords = mapGlobalToLayerCoords(coords.x, coords.y, layer);
+                state.lastPickedReplaceCoords = { x: localCoords.x, y: localCoords.y };
+            } else if (state.colorPickerTarget === "replace-to") {
+                if (dom.replaceColorTo) dom.replaceColorTo.value = hex;
+            } else if (state.colorPickerTarget === "bg-remove") {
+                if (dom.bgRemoveColor) dom.bgRemoveColor.value = hex;
+                if (layer) {
+                    const localCoords = mapGlobalToLayerCoords(coords.x, coords.y, layer);
+                    layer.bgRemoveSeedX = localCoords.x;
+                    layer.bgRemoveSeedY = localCoords.y;
+                    layer.bgRemoveColor = hex;
+                    layer.bgRemoveActive = true;
+                    if (dom.bgRemoveActive) dom.bgRemoveActive.checked = true;
+                    state.lastPickedTransparencyCoords = { x: localCoords.x, y: localCoords.y };
+                    
+                    propagateLayerChanges(layer, {
+                        bgRemoveSeedX: layer.bgRemoveSeedX,
+                        bgRemoveSeedY: layer.bgRemoveSeedY,
+                        bgRemoveColor: layer.bgRemoveColor,
+                        bgRemoveActive: layer.bgRemoveActive
+                    });
+                    
+                    filterCache.delete(layer.id);
+                }
+            } else if (state.colorPickerTarget === "bg-transparent-pick") {
+                if (dom.bgTransparentColor) dom.bgTransparentColor.value = hex;
+                if (layer) {
+                    const localCoords = mapGlobalToLayerCoords(coords.x, coords.y, layer);
+                    state.lastPickedTransparencyCoords = { x: localCoords.x, y: localCoords.y };
+                    updateTransparentPickStatus();
+                }
+            } else if (state.colorPickerTarget === "chain-erase") {
+                const localCoords = mapGlobalToLayerCoords(coords.x, coords.y, layer);
+                state.colorReplacements.push({
+                    type: "chain-erase",
+                    seedX: localCoords.x,
+                    seedY: localCoords.y
+                });
+                if (typeof updateReplacementsUI === "function") updateReplacementsUI();
+                filterCache.clear();
+            }
+            
+            // Disattiva la pulsazione delle pipette
+            document.querySelectorAll(".pipette-btn").forEach(btn => btn.classList.remove("pulse-pipette"));
+            
+            // Ripristina lo strumento attivo precedente (select o brush)
+            let prevToolBtn = dom.drawSelect;
+            let prevToolName = "select";
+            if (state.lastActiveToolBeforePicker && state.lastActiveToolBeforePicker !== "picker") {
+                prevToolName = state.lastActiveToolBeforePicker;
+                if (prevToolName === "brush") prevToolBtn = dom.drawBrush;
+                else if (prevToolName === "eraser") prevToolBtn = dom.drawEraser;
+            }
+            
+            if (prevToolBtn) {
+                prevToolBtn.click();
+            } else {
+                dom.drawSelect.click();
+            }
+            
+            requestRender();
             return;
         }
 
         if (state.activeTool === "magic_wand") {
             const localCoords = mapGlobalToLayerCoords(coords.x, coords.y, layer);
             saveState();
-            magicWandTool.onMouseDown(localCoords, layer);
+            applyMagicWand(layer, localCoords.x, localCoords.y);
             return;
         }
 
@@ -4260,10 +4021,19 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         if (state.activeTool === "lasso" && state.lasso.isDrawing) {
             const coords = getCoordsOnCanvas(e);
-            state.lasso.currentX = coords.x;
-            state.lasso.currentY = coords.y;
+            let cx = coords.x;
+            let cy = coords.y;
+            if (e.shiftKey && (state.lasso.mode === "rect" || state.lasso.mode === "circle")) {
+                const sx = state.lasso.startX;
+                const sy = state.lasso.startY;
+                const size = Math.max(Math.abs(cx - sx), Math.abs(cy - sy));
+                cx = sx + size * Math.sign(cx - sx || 1);
+                cy = sy + size * Math.sign(cy - sy || 1);
+            }
+            state.lasso.currentX = cx;
+            state.lasso.currentY = cy;
             if (state.lasso.mode === "free") {
-                state.lasso.points.push({ x: coords.x, y: coords.y });
+                state.lasso.points.push({ x: cx, y: cy });
             }
             requestRender();
             return;
@@ -4362,7 +4132,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (state.activeTool === "lasso" && state.lasso.isDrawing) {
             state.lasso.isDrawing = false;
-            state.lasso.hasSelection = true;
             if (state.lasso.mode === "rect") {
                 const sx = state.lasso.startX;
                 const sy = state.lasso.startY;
@@ -4372,6 +4141,46 @@ document.addEventListener("DOMContentLoaded", () => {
                     { x: sx, y: sy }, { x: ex, y: sy },
                     { x: ex, y: ey }, { x: sx, y: ey }
                 ];
+            } else if (state.lasso.mode === "circle") {
+                // Genera i punti del percorso ellittico perfetto (64 campioni sull'ellisse)
+                const sx = state.lasso.startX;
+                const sy = state.lasso.startY;
+                const ex = state.lasso.currentX;
+                const ey = state.lasso.currentY;
+                const cx = (sx + ex) / 2;
+                const cy = (sy + ey) / 2;
+                const rx = Math.abs(ex - sx) / 2;
+                const ry = Math.abs(ey - sy) / 2;
+                if (rx > 1 && ry > 1) {
+                    const STEPS = 64;
+                    state.lasso.points = [];
+                    for (let i = 0; i < STEPS; i++) {
+                        const angle = (2 * Math.PI * i) / STEPS;
+                        state.lasso.points.push({
+                            x: cx + rx * Math.cos(angle),
+                            y: cy + ry * Math.sin(angle)
+                        });
+                    }
+                    // Salva i parametri ellisse per uso preciso nei handler di taglio
+                    state.lasso.ellipse = { cx, cy, rx, ry };
+                } else {
+                    state.lasso.points = [];
+                    state.lasso.ellipse = null;
+                }
+            }
+            if (state.lasso.points.length > 2) {
+                state.lasso.hasSelection = true;
+                if (state.lasso.clearMode && typeof window.executeLassoClear === "function") {
+                    // Esegui la cancellazione immediata se siamo in modalità Toggle!
+                    window.executeLassoClear();
+                }
+            } else {
+                state.lasso.hasSelection = false;
+                state.lasso.points = [];
+                state.lasso.ellipse = null;
+            }
+            if (typeof window.updateLassoActionButtons === "function") {
+                window.updateLassoActionButtons();
             }
             requestRender();
             return;
@@ -4393,93 +4202,6 @@ document.addEventListener("DOMContentLoaded", () => {
         return { x: lx, y: ly };
     }
 
-    function floodFillMask(ctx, startX, startY, width, height, tolerance) {
-        const imgData = ctx.getImageData(0, 0, width, height);
-        const data = imgData.data;
-        const maskCanvas = document.createElement("canvas");
-        maskCanvas.width = width;
-        maskCanvas.height = height;
-        const maskCtx = maskCanvas.getContext("2d");
-        const maskData = maskCtx.createImageData(width, height);
-        const mData = maskData.data;
-
-        startX = Math.floor(startX);
-        startY = Math.floor(startY);
-        if (startX < 0 || startX >= width || startY < 0 || startY >= height) return maskCanvas;
-
-        const startPos = (startY * width + startX) * 4;
-        const startR = data[startPos];
-        const startG = data[startPos+1];
-        const startB = data[startPos+2];
-        const startA = data[startPos+3];
-
-        if (startA === 0) return maskCanvas; // Nessun pixel da proteggere
-
-        const maxDiff = (tolerance / 100) * 765; 
-
-        function colorMatch(pos) {
-            const r = data[pos];
-            const g = data[pos+1];
-            const b = data[pos+2];
-            const a = data[pos+3];
-            if (a === 0) return false;
-            return (Math.abs(r - startR) + Math.abs(g - startG) + Math.abs(b - startB)) <= maxDiff;
-        }
-
-        const stack = [startX, startY];
-        const visited = new Uint8Array(width * height);
-
-        while (stack.length > 0) {
-            const y = stack.pop();
-            const x = stack.pop();
-            let lx = x;
-
-            while (lx >= 0 && colorMatch((y * width + lx) * 4) && !visited[y * width + lx]) {
-                lx--;
-            }
-            lx++;
-            
-            let spanAbove = false;
-            let spanBelow = false;
-
-            while (lx < width && colorMatch((y * width + lx) * 4) && !visited[y * width + lx]) {
-                const idx = y * width + lx;
-                const pos = idx * 4;
-                
-                visited[idx] = 1;
-                mData[pos] = 255;
-                mData[pos+1] = 0;
-                mData[pos+2] = 0;
-                mData[pos+3] = 255; // Maschera protettiva rossa solida
-
-                if (y > 0) {
-                    if (colorMatch(((y - 1) * width + lx) * 4) && !visited[(y - 1) * width + lx]) {
-                        if (!spanAbove) {
-                            stack.push(lx, y - 1);
-                            spanAbove = true;
-                        }
-                    } else if (spanAbove) {
-                        spanAbove = false;
-                    }
-                }
-                if (y < height - 1) {
-                    if (colorMatch(((y + 1) * width + lx) * 4) && !visited[(y + 1) * width + lx]) {
-                        if (!spanBelow) {
-                            stack.push(lx, y + 1);
-                            spanBelow = true;
-                        }
-                    } else if (spanBelow) {
-                        spanBelow = false;
-                    }
-                }
-                lx++;
-            }
-        }
-        
-        maskCtx.putImageData(maskData, 0, 0);
-        return maskCanvas;
-    }
-
     function applyMagicWand(layer, localX, localY, isPropagation = false) {
         const tempCanvas = document.createElement("canvas");
         tempCanvas.width = layer.w;
@@ -4497,32 +4219,62 @@ document.addEventListener("DOMContentLoaded", () => {
             tCtx.drawImage(layer.drawingCanvas, 0, 0, layer.w, layer.h);
         }
 
-        const newMask = floodFillMask(tCtx, localX, localY, layer.w, layer.h, state.magicWandTolerance);
-        if (layer.protectionMask) {
-            const mCtx = layer.protectionMask.getContext("2d");
-            mCtx.drawImage(newMask, 0, 0);
-        } else {
-            layer.protectionMask = newMask;
-        }
+        const imgData = tCtx.getImageData(0, 0, layer.w, layer.h);
+        const dataBuffer = imgData.data;
 
-        if (state.editScope === "global" && !isPropagation) {
-            state.frames.forEach(frame => {
-                let targetLayer = frame.layers.find(l => l.id === layer.id);
-                if (!targetLayer) {
-                    const activeFrame = getActiveFrame();
-                    if (activeFrame) {
-                        const activeLayerIndex = activeFrame.layers.findIndex(l => l.id === layer.id);
-                        if (activeLayerIndex !== -1 && activeLayerIndex < frame.layers.length) {
-                            targetLayer = frame.layers[activeLayerIndex];
+        // Esegui il calcolo intensivo asincrono in background via Web Worker (Zero Micro-lag)
+        const filterWorker = new Worker('js/workers/image.worker.js');
+        
+        filterWorker.onmessage = function(e) {
+            const { action, maskBytes } = e.data;
+            if (action === "floodFillResult") {
+                const maskCanvas = document.createElement("canvas");
+                maskCanvas.width = layer.w;
+                maskCanvas.height = layer.h;
+                const mCtx = maskCanvas.getContext("2d");
+                const mData = mCtx.createImageData(layer.w, layer.h);
+                mData.data.set(maskBytes);
+                mCtx.putImageData(mData, 0, 0);
+
+                if (layer.protectionMask) {
+                    const lCtx = layer.protectionMask.getContext("2d");
+                    lCtx.drawImage(maskCanvas, 0, 0);
+                } else {
+                    layer.protectionMask = maskCanvas;
+                }
+
+                if (state.editScope === "global" && !isPropagation) {
+                    state.frames.forEach(frame => {
+                        let targetLayer = frame.layers.find(l => l.id === layer.id);
+                        if (!targetLayer) {
+                            const activeFrame = getActiveFrame();
+                            if (activeFrame) {
+                                const activeLayerIndex = activeFrame.layers.findIndex(l => l.id === layer.id);
+                                if (activeLayerIndex !== -1 && activeLayerIndex < frame.layers.length) {
+                                    targetLayer = frame.layers[activeLayerIndex];
+                                }
+                            }
                         }
-                    }
+                        if (targetLayer && targetLayer !== layer) {
+                            applyMagicWand(targetLayer, localX, localY, true);
+                        }
+                    });
                 }
-                if (targetLayer && targetLayer !== layer) {
-                    applyMagicWand(targetLayer, localX, localY, true);
-                }
-            });
-        }
-        requestRender();
+                requestRender();
+                filterWorker.terminate(); // Cleanup
+            }
+        };
+
+        // Passa il buffer tramite Transferable per eliminare qualsiasi overhead di copia dati
+        filterWorker.postMessage({
+            action: "floodFill",
+            imgDataBytes: dataBuffer,
+            width: layer.w,
+            height: layer.h,
+            startX: localX,
+            startY: localY,
+            tolerance: state.magicWandTolerance
+        }, [dataBuffer.buffer]);
     }
 
     function drawPoint(x, y, layer, isPropagation = false) {
@@ -4782,20 +4534,295 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    function checkSelectHandle(gx, gy, layer) {
+        const cx = gx - (layer.x + layer.w / 2);
+        const cy = gy - (layer.y + layer.h / 2);
+
+        const angleRad = -(layer.r * Math.PI) / 180;
+        const rx = cx * Math.cos(angleRad) - cy * Math.sin(angleRad);
+        const ry = cx * Math.sin(angleRad) + cy * Math.cos(angleRad);
+
+        const threshold = 12 / state.zoom; 
+        const halfW = layer.w / 2;
+        const halfH = layer.h / 2;
+
+        // 4 corners for resizing
+        if (Math.abs(rx - (-halfW)) <= threshold && Math.abs(ry - (-halfH)) <= threshold) {
+            return { type: "resize", corner: "tl" };
+        }
+        if (Math.abs(rx - halfW) <= threshold && Math.abs(ry - (-halfH)) <= threshold) {
+            return { type: "resize", corner: "tr" };
+        }
+        if (Math.abs(rx - (-halfW)) <= threshold && Math.abs(ry - halfH) <= threshold) {
+            return { type: "resize", corner: "bl" };
+        }
+        if (Math.abs(rx - halfW) <= threshold && Math.abs(ry - halfH) <= threshold) {
+            return { type: "resize", corner: "br" };
+        }
+
+        // 4 outer rotation handles
+        const rotOffset = 18 / state.zoom;
+        const rotThreshold = 10 / state.zoom;
+
+        if (Math.abs(rx - (-halfW - rotOffset)) <= rotThreshold && Math.abs(ry - (-halfH - rotOffset)) <= rotThreshold) {
+            return { type: "rotate", corner: "tl" };
+        }
+        if (Math.abs(rx - (halfW + rotOffset)) <= rotThreshold && Math.abs(ry - (-halfH - rotOffset)) <= rotThreshold) {
+            return { type: "rotate", corner: "tr" };
+        }
+        if (Math.abs(rx - (-halfW - rotOffset)) <= rotThreshold && Math.abs(ry - (halfH + rotOffset)) <= rotThreshold) {
+            return { type: "rotate", corner: "bl" };
+        }
+        if (Math.abs(rx - (halfW + rotOffset)) <= rotThreshold && Math.abs(ry - (halfH + rotOffset)) <= rotThreshold) {
+            return { type: "rotate", corner: "br" };
+        }
+
+        return null;
+    }
+
+    function startLayerTransform(mouseDownEvent, layer, handle) {
+        saveState();
+        const startCoords = getCoordsOnCanvas(mouseDownEvent);
+        const theta = (layer.r * Math.PI) / 180;
+        const cosT = Math.cos(theta);
+        const sinT = Math.sin(theta);
+
+        state.transform.isTransforming = true;
+        state.transform.type = handle.type;
+        state.transform.corner = handle.corner;
+        state.transform.startX = startCoords.x;
+        state.transform.startY = startCoords.y;
+        state.transform.initialLayerX = layer.x;
+        state.transform.initialLayerY = layer.y;
+        state.transform.initialLayerW = layer.w;
+        state.transform.initialLayerH = layer.h;
+        state.transform.initialLayerR = layer.r;
+
+        const cx = layer.x + layer.w / 2;
+        const cy = layer.y + layer.h / 2;
+
+        if (handle.type === "resize") {
+            let lx_opp = 0, ly_opp = 0;
+            let cornerSignX = 1, cornerSignY = 1;
+
+            if (handle.corner === "br") {
+                lx_opp = -layer.w / 2; ly_opp = -layer.h / 2;
+                cornerSignX = 1; cornerSignY = 1;
+            } else if (handle.corner === "bl") {
+                lx_opp = layer.w / 2; ly_opp = -layer.h / 2;
+                cornerSignX = -1; cornerSignY = 1;
+            } else if (handle.corner === "tr") {
+                lx_opp = -layer.w / 2; ly_opp = layer.h / 2;
+                cornerSignX = 1; cornerSignY = -1;
+            } else if (handle.corner === "tl") {
+                lx_opp = layer.w / 2; ly_opp = layer.h / 2;
+                cornerSignX = -1; cornerSignY = -1;
+            }
+
+            state.transform.oppositeX = cx + lx_opp * cosT - ly_opp * sinT;
+            state.transform.oppositeY = cy + lx_opp * sinT + ly_opp * cosT;
+            state.transform.cornerSignX = cornerSignX;
+            state.transform.cornerSignY = cornerSignY;
+        } else if (handle.type === "rotate") {
+            state.transform.startAngle = Math.atan2(startCoords.y - cy, startCoords.x - cx) * 180 / Math.PI;
+        }
+
+        function onMouseMove(moveEvent) {
+            const currentCoords = getCoordsOnCanvas(moveEvent);
+            
+            if (state.transform.type === "resize") {
+                const mx = currentCoords.x;
+                const my = currentCoords.y;
+                const ox = state.transform.oppositeX;
+                const oy = state.transform.oppositeY;
+
+                const dx = mx - ox;
+                const dy = my - oy;
+
+                const projX = dx * cosT + dy * sinT;
+                const projY = -dx * sinT + dy * cosT;
+
+                const signX = state.transform.cornerSignX;
+                const signY = state.transform.cornerSignY;
+
+                let newW = projX * signX;
+                let newH = projY * signY;
+
+                newW = Math.max(10, newW);
+                newH = Math.max(10, newH);
+
+                if (layer.keepRatio) {
+                    const aspect = state.transform.initialLayerW / state.transform.initialLayerH;
+                    if (newW / newH > aspect) {
+                        newW = newH * aspect;
+                    } else {
+                        newH = newW / aspect;
+                    }
+                }
+
+                const ncx = ox + (signX * newW / 2) * cosT - (signY * newH / 2) * sinT;
+                const ncy = oy + (signX * newW / 2) * sinT + (signY * newH / 2) * cosT;
+
+                layer.w = Math.round(newW);
+                layer.h = Math.round(newH);
+                layer.x = Math.round(ncx - newW / 2);
+                layer.y = Math.round(ncy - newH / 2);
+
+                if (dom.xyzW) dom.xyzW.value = layer.w;
+                if (dom.xyzH) dom.xyzH.value = layer.h;
+                if (dom.xyzPosX) dom.xyzPosX.value = layer.x;
+                if (dom.xyzPosY) dom.xyzPosY.value = layer.y;
+
+                propagateLayerChanges(layer, {
+                    w: layer.w,
+                    h: layer.h,
+                    x: layer.x,
+                    y: layer.y
+                });
+            } else if (state.transform.type === "rotate") {
+                const mx = currentCoords.x;
+                const my = currentCoords.y;
+
+                const ccx = layer.x + layer.w / 2;
+                const ccy = layer.y + layer.h / 2;
+
+                const currentAngle = Math.atan2(my - ccy, mx - ccx) * 180 / Math.PI;
+                const deltaAngle = currentAngle - state.transform.startAngle;
+
+                layer.r = Math.round(state.transform.initialLayerR + deltaAngle);
+                layer.r = (layer.r % 360 + 360) % 360;
+                if (layer.r > 180) layer.r -= 360;
+
+                if (dom.xyzR) dom.xyzR.value = layer.r;
+
+                propagateLayerChanges(layer, { r: layer.r });
+            }
+
+            requestRender();
+        }
+
+        function onMouseUp() {
+            state.transform.isTransforming = false;
+            if (state.editScope === "global" && layer.keyframes && Object.keys(layer.keyframes).length > 0) {
+                if (state.transform.type === "resize") {
+                    const initialW = state.transform.initialLayerW;
+                    const initialH = state.transform.initialLayerH;
+                    if (initialW > 0 && initialH > 0) {
+                        const scaleW = layer.w / initialW;
+                        const scaleH = layer.h / initialH;
+                        const dx = layer.x - state.transform.initialLayerX;
+                        const dy = layer.y - state.transform.initialLayerY;
+                        
+                        Object.keys(layer.keyframes).forEach(k => {
+                            if (layer.keyframes[k].w !== undefined) layer.keyframes[k].w = Math.round(layer.keyframes[k].w * scaleW);
+                            if (layer.keyframes[k].h !== undefined) layer.keyframes[k].h = Math.round(layer.keyframes[k].h * scaleH);
+                            if (layer.keyframes[k].x !== undefined) layer.keyframes[k].x = Math.round(layer.keyframes[k].x + dx);
+                            if (layer.keyframes[k].y !== undefined) layer.keyframes[k].y = Math.round(layer.keyframes[k].y + dy);
+                        });
+                        propagateLayerKeyframes(layer);
+                        buildTimelineUI();
+                    }
+                } else if (state.transform.type === "rotate") {
+                    const dr = layer.r - state.transform.initialLayerR;
+                    if (dr !== 0) {
+                        Object.keys(layer.keyframes).forEach(k => {
+                            if (layer.keyframes[k].r !== undefined) {
+                                let nr = Math.round(layer.keyframes[k].r + dr);
+                                nr = (nr % 360 + 360) % 360;
+                                if (nr > 180) nr -= 360;
+                                layer.keyframes[k].r = nr;
+                            }
+                        });
+                        propagateLayerKeyframes(layer);
+                        buildTimelineUI();
+                    }
+                }
+            }
+            syncCurrentFrameKeyframeFromLayer(layer);
+            document.removeEventListener("mousemove", onMouseMove);
+            document.removeEventListener("mouseup", onMouseUp);
+        }
+
+        document.addEventListener("mousemove", onMouseMove);
+        document.addEventListener("mouseup", onMouseUp);
+    }
+
+    function isPixelTransparent(layer, x, y) {
+        if (x < 0 || x > layer.w || y < 0 || y > layer.h) return true;
+        if (layer.type === "text") return false; // I testi non usano il pass-through dei singoli pixel per facilitare il click
+        
+        const source = layer.canvasImage || layer.img;
+        if (!source) return false;
+        
+        try {
+            if (!context.tempSelectCanvas) {
+                context.tempSelectCanvas = document.createElement("canvas");
+                context.tempSelectCanvas.width = 1;
+                context.tempSelectCanvas.height = 1;
+                context.tempSelectCtx = context.tempSelectCanvas.getContext("2d", { willReadFrequently: true });
+            }
+            
+            const tCtx = context.tempSelectCtx;
+            tCtx.clearRect(0, 0, 1, 1);
+            
+            const sourceW = source.naturalWidth || source.width || layer.w;
+            const sourceH = source.naturalHeight || source.height || layer.h;
+            
+            const sx = (x / layer.w) * sourceW;
+            const sy = (y / layer.h) * sourceH;
+            
+            tCtx.drawImage(source, sx, sy, 1, 1, 0, 0, 1, 1);
+            
+            if (layer.drawingCanvas) {
+                const dsx = (x / layer.w) * layer.drawingCanvas.width;
+                const dsy = (y / layer.h) * layer.drawingCanvas.height;
+                tCtx.drawImage(layer.drawingCanvas, dsx, dsy, 1, 1, 0, 0, 1, 1);
+            }
+            
+            const imgData = tCtx.getImageData(0, 0, 1, 1);
+            return imgData.data[3] < 10; // Rileva trasparenza (Alpha < 10 su 255)
+        } catch (err) {
+            console.error("Errore nel rilevamento della trasparenza del pixel:", err);
+            return false;
+        }
+    }
+
     function handleCanvasSelect(e) {
         const coords = getCoordsOnCanvas(e);
         const frame = getActiveFrame();
         if (!frame) return;
 
+        // 1. Controlla prima se abbiamo cliccato una maniglia del livello attivo
+        const activeLayer = getActiveLayer();
+        if (activeLayer && !activeLayer.locked) {
+            const handle = checkSelectHandle(coords.x, coords.y, activeLayer);
+            if (handle) {
+                startLayerTransform(e, activeLayer, handle);
+                return;
+            }
+        }
+
+        // 2. Altrimenti controlla se abbiamo cliccato su uno dei livelli visibili
         for (let i = frame.layers.length - 1; i >= 0; i--) {
             const l = frame.layers[i];
+            const isSelfActive = (l.id === state.activeLayerId);
             if (!l.visible) continue;
+            if (l.locked && !isSelfActive) continue;
 
             const local = mapGlobalToLayerCoords(coords.x, coords.y, l);
             if (local.x >= 0 && local.x <= l.w && local.y >= 0 && local.y <= l.h) {
+                // Controllo pixel-perfect di trasparenza (solo per i livelli non attivi)
+                if (!isSelfActive && isPixelTransparent(l, local.x, local.y)) {
+                    continue; // Passa al livello sottostante se il pixel cliccato è trasparente!
+                }
+
                 state.activeLayerId = l.id;
+                state.transform.dragLayerId = l.id; // Ancoraggio automatico
                 updateLayersListUI();
                 updateXYZControlsUI();
+                requestRender();
+
+                // Avvia il trascinamento immediatamente con singolo click!
                 startLayerDrag(e, l);
                 return;
             }
@@ -4826,6 +4853,18 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         function onMouseUp() {
+            if (state.editScope === "global") {
+                const dx = layer.x - startX;
+                const dy = layer.y - startY;
+                if ((dx !== 0 || dy !== 0) && layer.keyframes && Object.keys(layer.keyframes).length > 0) {
+                    Object.keys(layer.keyframes).forEach(k => {
+                        if (layer.keyframes[k].x !== undefined) layer.keyframes[k].x += dx;
+                        if (layer.keyframes[k].y !== undefined) layer.keyframes[k].y += dy;
+                    });
+                    propagateLayerKeyframes(layer);
+                    buildTimelineUI();
+                }
+            }
             syncCurrentFrameKeyframeFromLayer(layer);
             document.removeEventListener("mousemove", onMouseMove);
             document.removeEventListener("mouseup", onMouseUp);
@@ -4916,20 +4955,6 @@ document.addEventListener("DOMContentLoaded", () => {
                         }
                     }
 
-                    if (isFirstImport) {
-                        applyWorkspaceDimensions(img.width, img.height);
-                    } else {
-                        // Crea un nuovo frame per il file secondario!
-                        const newFrame = {
-                            id: generateId(),
-                            delay: 100,
-                            layers: []
-                        };
-                        state.frames.push(newFrame);
-                        state.activeFrameIndex = state.frames.length - 1;
-                        buildTimelineUI();
-                    }
-
                     const newLayer = {
                         id: generateId(),
                         groupId: generateId(),
@@ -4952,10 +4977,24 @@ document.addEventListener("DOMContentLoaded", () => {
                         transparencyRules: [],
                         keyframes: {}
                     };
-                    addLayer(newLayer);
-                    // Centra la vista (senza sovrascrivere lo zoom che e' gia' stato calcolato)
+
                     if (isFirstImport) {
+                        applyWorkspaceDimensions(img.width, img.height);
+                        addLayer(newLayer);
                         setTimeout(centerCanvas, 80);
+                    } else {
+                        // Crea un nuovo livello per tutti i frame esistenti del progetto! (layer Frm)
+                        saveState();
+                        state.frames.forEach((frame) => {
+                            const frameLayer = { ...newLayer };
+                            const maxZ = frame.layers.reduce((max, l) => Math.max(max, isNaN(l.z) ? 0 : (l.z || 0)), 0);
+                            frameLayer.z = maxZ + 1;
+                            frame.layers.push(frameLayer);
+                        });
+                        state.activeLayerId = newLayer.id;
+                        updateLayersListUI();
+                        updateXYZControlsUI();
+                        requestRender();
                     }
                 };
                 img.src = e.target.result;
@@ -4976,13 +5015,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 const newLayer = {
                     id: sharedId,
                     groupId: sharedGroupId,
-                    name: "Rif: " + file.name.substring(0, 12),
+                    name: "File: " + file.name.substring(0, 12),
                     type: "image",
                     x: 0,
                     y: 0,
-                    w: state.canvasWidth, h: state.canvasHeight, visible: true, opacity: 0.7, r: 0, keepRatio: true, aspectRatio: 1, img: null,
+                    w: state.canvasWidth, h: state.canvasHeight, visible: true, opacity: 1.0, r: 0, keepRatio: true, aspectRatio: 1, img: null,
                     borderRadius: 0,
-                    locked: true,
+                    locked: false,
                     isReference: true,
                     chromaActive: false,
                     chromaColor: "#ffffff",
@@ -4993,7 +5032,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     keyframes: {}
                 };
                 
-                // Aggiungiamo il livello di riferimento a tutti i fotogrammi del progetto
                 state.frames.forEach((frame) => {
                     const frameLayer = { ...newLayer };
                     const maxZ = frame.layers.reduce((max, l) => Math.max(max, isNaN(l.z) ? 0 : (l.z || 0)), 0);
@@ -5004,6 +5042,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 const activeLayer = getActiveFrame().layers.find(l => l.id === sharedId);
                 decodeUploadedReferenceGif(e.target.result, activeLayer);
+                
+                buildTimelineUI();
                 
                 if (state.activeTool !== "select") {
                     dom.drawSelect.click();
@@ -5022,20 +5062,20 @@ document.addEventListener("DOMContentLoaded", () => {
                     const newLayer = {
                         id: sharedId,
                         groupId: sharedGroupId,
-                        name: "Rif: " + file.name.substring(0, 12),
+                        name: "File: " + file.name.substring(0, 12),
                         type: "image",
                         x: Math.round((state.canvasWidth - (img.width * Math.min(state.canvasWidth / img.width, state.canvasHeight / img.height, 1))) / 2),
                         y: Math.round((state.canvasHeight - (img.height * Math.min(state.canvasWidth / img.width, state.canvasHeight / img.height, 1))) / 2),
                         w: Math.round(img.width * Math.min(state.canvasWidth / img.width, state.canvasHeight / img.height, 1)),
                         h: Math.round(img.height * Math.min(state.canvasWidth / img.width, state.canvasHeight / img.height, 1)),
                         visible: true,
-                        opacity: 0.7, // Opacità 70% di default per ricalco
+                        opacity: 1.0, // Opacità 100% di default
                         r: 0,
                         keepRatio: true,
                         aspectRatio: img.width / img.height,
                         img: img,
                         borderRadius: 0,
-                        locked: true,        // Livello bloccato
+                        locked: false,        // Livello sbloccato modificabile
                         isReference: true,   // Contrassegno riferimento
                         chromaActive: false,
                         chromaColor: "#ffffff",
@@ -5054,6 +5094,8 @@ document.addEventListener("DOMContentLoaded", () => {
                         frame.layers.push(frameLayer);
                     });
                     state.activeLayerId = sharedId;
+                    
+                    buildTimelineUI();
                     
                     // Seleziona automaticamente lo strumento di selezione
                     if (state.activeTool !== "select") {
@@ -5882,6 +5924,50 @@ document.addEventListener("DOMContentLoaded", () => {
         dom.framesTrack.innerHTML = "";
         if (dom.keyframesTrackBox) dom.keyframesTrackBox.innerHTML = "";
 
+        // Rilevamento presenza di un livello di riferimento
+        const hasReference = state.frames.some(frame => frame.layers.some(l => l.isReference));
+        let refTrack = document.getElementById("timeline-reference-frames-box");
+        let refLabel = document.getElementById("track-label-reference");
+
+        const timelineScroll = document.getElementById("timeline-scroll-container");
+        const trackViewport = document.querySelector(".timeline-tracks-viewport");
+        const trackLabels = document.querySelector(".timeline-track-labels");
+
+        if (hasReference) {
+            if (!refTrack) {
+                refTrack = document.createElement("div");
+                refTrack.id = "timeline-reference-frames-box";
+                refTrack.className = "frames-track frames-track-reference";
+                if (dom.keyframesTrackBox) {
+                    dom.keyframesTrackBox.parentNode.insertBefore(refTrack, dom.keyframesTrackBox);
+                }
+            }
+            refTrack.innerHTML = "";
+            refTrack.style.display = "flex";
+
+            if (!refLabel) {
+                refLabel = document.createElement("span");
+                refLabel.id = "track-label-reference";
+                refLabel.className = "track-label track-label-reference";
+                refLabel.innerText = "Rif";
+                const kfLabel = document.querySelector(".track-label-kf");
+                if (kfLabel) {
+                    kfLabel.parentNode.insertBefore(refLabel, kfLabel);
+                }
+            }
+            refLabel.style.display = "flex";
+
+            if (timelineScroll) timelineScroll.classList.add("has-reference-track");
+            if (trackViewport) trackViewport.style.gridTemplateRows = "1fr 1fr 0.7fr";
+            if (trackLabels) trackLabels.style.gridTemplateRows = "1fr 1fr 0.7fr";
+        } else {
+            if (refTrack) refTrack.style.display = "none";
+            if (refLabel) refLabel.style.display = "none";
+            if (timelineScroll) timelineScroll.classList.remove("has-reference-track");
+            if (trackViewport) trackViewport.style.gridTemplateRows = "";
+            if (trackLabels) trackLabels.style.gridTemplateRows = "";
+        }
+
         const targetType = dom.keyframeTarget ? dom.keyframeTarget.value : "active";
         const kfLayer = resolveKeyframeTargetLayer(targetType);
         const kfIndices = kfLayer ? getSortedKeyframeFrames(kfLayer) : [];
@@ -5908,9 +5994,71 @@ document.addEventListener("DOMContentLoaded", () => {
                     <span>${frame.delay}ms</span>
                 </div>
             `;
-            card.addEventListener("click", () => selectFrame(idx));
+            card.title = "Clicca per selezionare il fotogramma e ancorare il livello (poi trascina sul canvas)";
+            card.addEventListener("click", () => {
+                const previousActiveLayerId = state.activeLayerId;
+                selectFrame(idx);
+                
+                const targetFrame = state.frames[idx];
+                if (targetFrame) {
+                    let mainLayer = targetFrame.layers.find(l => l.id === previousActiveLayerId);
+                    if (!mainLayer) {
+                        mainLayer = targetFrame.layers.find(l => !l.isReference);
+                    }
+                    if (!mainLayer) {
+                        mainLayer = targetFrame.layers[0];
+                    }
+                    if (mainLayer) {
+                        state.activeLayerId = mainLayer.id;
+                        state.transform.dragLayerId = mainLayer.id;
+                        updateLayersListUI();
+                        updateXYZControlsUI();
+                        requestRender();
+                    }
+                }
+            });
             frameCol.appendChild(card);
             dom.framesTrack.appendChild(frameCol);
+
+            // Popola il canale di riferimento se presente
+            if (hasReference && refTrack) {
+                const refCard = document.createElement("div");
+                refCard.className = `frame-thumbnail-card ${isCurrent ? "active-frame" : ""}`;
+                
+                let refImgHtml = "";
+                const currentRefLayer = frame.layers.find(l => l.isReference);
+                if (currentRefLayer && (currentRefLayer.canvasImage || currentRefLayer.img)) {
+                    refImgHtml = `<img src="${(currentRefLayer.canvasImage || currentRefLayer.img).src}" alt="ref preview">`;
+                }
+                
+                refCard.innerHTML = `
+                    <div class="frame-card-preview">${refImgHtml}</div>
+                    <div class="frame-card-footer" style="justify-content: center; height: 18px;">
+                        <span class="frame-index" style="font-size: 9px; color: var(--accent-color); font-weight: 800;">FILE #${idx + 1}</span>
+                    </div>
+                `;
+                refCard.title = "Clicca per selezionare e ancorare il file secondario (poi trascina sul canvas)";
+                refCard.addEventListener("click", () => {
+                    selectFrame(idx);
+                    // Seleziona e ancora il livello di riferimento come se fosse un doppio click sul canvas:
+                    // l'utente può subito trascinarlo con un singolo drag, senza dover fare doppio click.
+                    const targetFrame = state.frames[idx];
+                    const refLayer = targetFrame && targetFrame.layers.find(l => l.isReference);
+                    if (refLayer) {
+                        state.activeLayerId = refLayer.id;
+                        state.transform.dragLayerId = refLayer.id;
+                        updateLayersListUI();
+                        updateXYZControlsUI();
+                        requestRender();
+                    }
+                });
+                
+                const refCol = document.createElement("div");
+                refCol.className = `timeline-frame-column ${isCurrent ? "active-column" : ""}`;
+                refCol.dataset.index = idx;
+                refCol.appendChild(refCard);
+                refTrack.appendChild(refCol);
+            }
 
             if (dom.keyframesTrackBox) {
                 const betweenKf = kfIndices.some((k, i) => {
@@ -6906,6 +7054,21 @@ document.addEventListener("DOMContentLoaded", () => {
             // Salvataggio dello stato all'evento focus per evitare sovraccarichi sullo stack di Undo
             input.addEventListener("focus", () => {
                 saveState();
+                const layer = getActiveLayer();
+                if (layer) {
+                    initialGlobalEditLayer = {
+                        x: layer.x,
+                        y: layer.y,
+                        w: layer.w,
+                        h: layer.h,
+                        r: layer.r,
+                        z: layer.z,
+                        opacity: layer.opacity
+                    };
+                }
+            });
+            input.addEventListener("blur", () => {
+                initialGlobalEditLayer = null;
             });
         });
 
@@ -7524,7 +7687,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // PROGETTO E FILE
             "btn-apply-canvas-size": "Applica Grandezza: Conferma le dimensioni che hai scritto nei campi Larghezza e Altezza e ridimensiona la tavola da disegno.",
-            "btn-import-reference": "Importa Riferimento: Carica un'immagine o GIF come livello di riferimento 'bloccato'. Non si può modificare, è solo una guida visiva da usare come traccia.",
+            "btn-import-reference": "Importa File: Carica un'immagine o GIF come file secondario modificabile per usarla come guida o elemento di composizione.",
             "btn-export-file": "Esporta File: Salva il tuo lavoro sul computer nel formato scelto (PNG, JPG o GIF animata). Questo è il risultato finale!",
             "file-dropzone": "Zona Importazione: Trascina qui un file PNG, JPG o GIF dal tuo computer, oppure clicca per aprire il pannello di selezione file.",
 

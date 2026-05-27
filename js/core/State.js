@@ -21,7 +21,7 @@ export const state = {
         // Strumento di disegno in uso
         activeTool: "select", // "select" (sposta), "brush" (pennello), "eraser" (gomma), "picker" (copia colore), "magic_wand"
         eraserMode: "brush", // "brush" (tratti) o "gif" (pixel sfondo GIF)
-        editScope: "local", // "local" (solo frame corrente) o "global" (tutta la gif)
+        editScope: "frame", // "frame" (solo frame corrente) o "global" (tutta la gif)
         colorReplacements: [], // lista sostituzioni globali
         magicWandTolerance: 20,
         protectionMask: null, // Maschera di protezione calcolata dalla bacchetta magica
@@ -53,7 +53,9 @@ export const state = {
             mode: "free",
             isDrawing: false,
             hasSelection: false,
+            clearMode: false,
             points: [],
+            ellipse: null,
             startX: 0,
             startY: 0,
             currentX: 0,
@@ -75,5 +77,24 @@ export const state = {
         colorPickerTarget: "brush", // "brush", "chroma", "replace-from", "replace-to", "bg-remove", "bg-transparent-pick"
         lastPickedTransparencyCoords: null,
         exportDirectoryHandle: null,
-        autoKeyframe: true
+        autoKeyframe: true,
+
+        transform: {
+            isTransforming: false,
+            type: null,
+            corner: null,
+            startX: 0,
+            startY: 0,
+            startW: 0,
+            startH: 0,
+            startAngle: 0,
+            initialLayerX: 0,
+            initialLayerY: 0,
+            initialLayerW: 0,
+            initialLayerH: 0,
+            initialLayerR: 0,
+            oppositeX: 0,
+            oppositeY: 0,
+            dragLayerId: null
+        }
     };

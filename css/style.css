@@ -1533,6 +1533,45 @@ input[type="number"].ui-number-compact:focus {
     border-top: 1px solid rgba(var(--accent-color-rgb), 0.12);
 }
 
+/* STILI PER SECONDO CANALE FOTOGRAMMI DI RIFERIMENTO ADATTIVO */
+.frames-track-reference {
+    display: flex;
+    gap: 8px;
+    padding: 12px 10px;
+    align-items: stretch;
+    min-height: 0;
+    flex: 1;
+    background: rgba(255, 255, 255, 0.02);
+    border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.track-label-reference {
+    color: var(--accent-color);
+    border-top: 1px solid var(--border-window);
+    opacity: 0.85;
+    flex: 1;
+}
+
+/* ADATTAMENTO GRANDEZZE IN CASO DI LIVELLO DI RIFERIMENTO IMPORTATO */
+.timeline-dual-scroll.has-reference-track .timeline-tracks-viewport {
+    grid-template-rows: 1fr 1fr 0.7fr;
+}
+
+.timeline-dual-scroll.has-reference-track .timeline-track-labels {
+    grid-template-rows: 1fr 1fr 0.7fr;
+}
+
+.timeline-dual-scroll.has-reference-track .frame-thumbnail-card {
+    min-height: 40px;
+    max-height: 70px;
+}
+
+.timeline-dual-scroll.has-reference-track .frames-track,
+.timeline-dual-scroll.has-reference-track .frames-track-reference,
+.timeline-dual-scroll.has-reference-track .keyframes-track {
+    padding: 6px 10px;
+}
+
 .timeline-kf-column {
     display: flex;
     flex-direction: column;
@@ -3060,3 +3099,56 @@ body.tutorial-mode * {
     width: 100%;
     height: 100%;
 }
+
+/* ==========================================================================
+   STRUMENTO LAZO - STILI PULSANTI D'AZIONE ED EFFETTO TOGGLE
+   ========================================================================== */
+
+/* Disabilitazione dei bottoni d'azione del lazo */
+.btn-primary:disabled,
+.btn-danger:disabled,
+.btn:disabled,
+button:disabled {
+    opacity: 0.35 !important;
+    cursor: not-allowed !important;
+    pointer-events: none !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+/* Pulsante Pulisci Area inattivo (grigio/neutro) */
+#btn-lasso-clear.inactive {
+    opacity: 0.45;
+    background-color: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid var(--text-input-border) !important;
+    color: var(--text-secondary) !important;
+    box-shadow: none !important;
+}
+
+/* Pulsante Pulisci Area attivo (modalità Toggle ON - rosso neon pulsante) */
+#btn-lasso-clear.active {
+    opacity: 1 !important;
+    background-color: rgba(239, 68, 68, 0.25) !important;
+    color: #f87171 !important;
+    border: 1px solid #ef4444 !important;
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.45) !important;
+    font-weight: 700 !important;
+    animation: pulse-red-neon 2s infinite ease-in-out;
+}
+
+@keyframes pulse-red-neon {
+    0% {
+        box-shadow: 0 0 8px rgba(239, 68, 68, 0.35);
+        border-color: rgba(239, 68, 68, 0.8);
+    }
+    50% {
+        box-shadow: 0 0 16px rgba(239, 68, 68, 0.7);
+        border-color: rgb(239, 68, 68);
+        background-color: rgba(239, 68, 68, 0.35) !important;
+    }
+    100% {
+        box-shadow: 0 0 8px rgba(239, 68, 68, 0.35);
+        border-color: rgba(239, 68, 68, 0.8);
+    }
+}
+

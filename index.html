@@ -177,10 +177,10 @@
                         </div>
 
                         <div class="control-group">
-                            <label>Importa Riferimento (Bloccato)</label>
-                            <button id="btn-import-reference" class="btn btn-secondary btn-block" title="Importa PNG, JPG o GIF come livello di riferimento non modificabile">
+                            <label>Importa File</label>
+                            <button id="btn-import-reference" class="btn btn-secondary btn-block" title="Importa PNG, JPG o GIF come file secondario modificabile">
                                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                                + Importa Riferimento
+                                + Importa File
                             </button>
                             <input type="file" id="file-input-reference" accept="image/png, image/jpeg, image/gif" style="display: none;">
                         </div>
@@ -413,17 +413,7 @@
                             </button>
                         </div>
                         
-                        <!-- Opzioni Lasso -->
-                        <div class="control-group" id="lasso-settings-group" style="display: none;">
-                            <button id="btn-lasso-cut" class="primary-btn" style="width: 100%; padding: 10px; border-radius: 6px; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 8px;">
-                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
-                                Ritaglia ed Estrai Livello
-                            </button>
-                            <button id="btn-lasso-clear" class="danger-btn" style="width: 100%; padding: 10px; border-radius: 6px; cursor: pointer; border: 1px solid var(--danger-color); background: rgba(255,59,48,0.1); color: var(--danger-color); display: flex; justify-content: center; align-items: center; gap: 8px;">
-                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                                Pulisci Area (Taglia Solco)
-                            </button>
-                        </div>
+
 
                         <!-- Opzione gomma avanzata: Gomma Pennello vs Gomma Sfondo GIF -->
                         <div class="control-group" id="eraser-mode-group" style="display: none;">
@@ -486,16 +476,16 @@
                         <!-- Opzioni Lasso -->
                         <div class="control-group" id="lasso-settings-group" style="display: none;">
                             <label id="tut-title-lasso-settings">Impostazioni Lazo</label>
-                            <div class="input-row props-grid-2" style="margin-bottom: 12px;">
+                             <div class="input-row props-grid-3" style="margin-bottom: 12px;">
                                 <button type="button" id="lasso-mode-free" class="mode-btn active" title="Seleziona un'area libera a mano libera">A Mano Libera</button>
-                                <button type="button" id="lasso-mode-rect" class="mode-btn" title="Seleziona un'area quadrata/rettangolare">Rettangolare</button>
+                                <button type="button" id="lasso-mode-rect" class="mode-btn" title="Seleziona un'area rettangolare (tieni Shift per quadrato)">Rettangolo</button>
+                                <button type="button" id="lasso-mode-circle" class="mode-btn" title="Seleziona un'area circolare (tieni Shift per cerchio)">Cerchio</button>
                             </div>
-                            
-                            <button id="btn-lasso-cut" class="primary-btn" style="width: 100%; padding: 10px; border-radius: 6px; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 8px;">
+                            <button id="btn-lasso-cut" class="btn btn-primary" style="width: 100%; margin-bottom: 8px;" disabled>
                                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
                                 Ritaglia ed Estrai Livello
                             </button>
-                            <button id="btn-lasso-clear" class="danger-btn" style="width: 100%; padding: 10px; border-radius: 6px; cursor: pointer; border: 1px solid var(--danger-color); background: rgba(255,59,48,0.1); color: var(--danger-color); display: flex; justify-content: center; align-items: center; gap: 8px;">
+                            <button id="btn-lasso-clear" class="btn btn-danger inactive" style="width: 100%;">
                                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                                 Pulisci Area (Taglia Solco)
                             </button>
@@ -814,7 +804,7 @@
                     
                     <select id="keyframe-target" class="select-field-sm" title="Livello da animare" style="flex-shrink:0;">
                         <option value="main">Principale</option>
-                        <option value="reference">Riferimento</option>
+                        <option value="reference">File Secondario</option>
                         <option value="active">Attivo</option>
                     </select>
                     
@@ -846,8 +836,8 @@
                     </div>
 
                     <!-- TAB SPOSTATA SULLA DESTRA (SPINTA DA MARGIN-LEFT: AUTO) -->
-                    <div class="window-tabs-header" style="border: none; background: transparent; min-height: unset; height: auto; display: flex; align-items: center; padding: 0; margin-left: auto; flex-shrink: 0;">
-                        <button class="tab-btn active" data-tab="tab-timeline-content" style="margin: 0; white-space: nowrap;">🎞️ Sequenza Frame</button>
+                    <div class="window-tabs-header" style="border: none; background: transparent; min-height: unset; height: auto; display: flex; align-items: center; padding: 0; margin-left: auto; flex-shrink: 0; margin-right: 8px;">
+                        <button class="tab-btn active" data-tab="tab-timeline-content" style="margin: 4px 6px; padding: 6px 12px; white-space: nowrap; border: 1.5px solid var(--accent-color); border-radius: 8px; box-shadow: 0 0 10px rgba(var(--accent-color-rgb), 0.35);">🎞️ Sequenza Frame</button>
                     </div>
 
                 </div>

@@ -66,6 +66,7 @@ export const dom = {
         lassoSettingsGroup: document.getElementById("lasso-settings-group"),
         lassoModeFree: document.getElementById("lasso-mode-free"),
         lassoModeRect: document.getElementById("lasso-mode-rect"),
+        lassoModeCircle: document.getElementById("lasso-mode-circle"),
         btnLassoCut: document.getElementById("btn-lasso-cut"),
         btnLassoClear: document.getElementById("btn-lasso-clear"),
         brushSettings: document.getElementById("brush-settings-group"),
